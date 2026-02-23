@@ -1,0 +1,332 @@
+// Church Ministry Management System - Prisma schema
+// Matches existing migration 20260223040823_init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RequestType {
+  ARF
+  PRF
+  LINEUP
+}
+
+enum ApprovalAction {
+  approved
+  rejected
+}
+
+enum SongSection {
+  Joyful
+  Solemn
+}
+
+enum ReminderChannel {
+  in_app
+  email
+}
+
+model Role {
+  id         String   @id @default(cuid())
+  name       String
+  slug       String   @unique
+  permissions RolePermission[]
+  users      User[]
+}
+
+model Permission {
+  id        String   @id @default(cuid())
+  name      String
+  resource  String
+  action    String
+  roles     RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model Ministry {
+  id            String        @id @default(cuid())
+  name          String
+  slug          String        @unique
+  description   String?
+  active        Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  users         User[]
+  userMinistries UserMinistry[]
+  arfs          ARF[]
+  prfs          PRF[]
+  lineups       Lineup[]
+  prayers       Prayer[]
+}
+
+model UserMinistry {
+  userId     String
+  ministryId String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ministry   Ministry @relation(fields: [ministryId], references: [id], onDelete: Cascade)
+
+  @@id([userId, ministryId])
+}
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  hashedPassword String
+  name           String
+  address        String?
+  age            Int?
+  birthday       DateTime?
+  status         String    @default("active")
+  ministryId     String?
+  roleId         String
+  resetToken     String?
+  resetTokenExp  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  ministry         Ministry?      @relation(fields: [ministryId], references: [id], onDelete: SetNull)
+  userMinistries   UserMinistry[]
+  role             Role           @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  arfsCreated    ARF[]     @relation("ARFCreatedBy")
+  prfsCreated    PRF[]     @relation("PRFCreatedBy")
+  approvalHistory ApprovalHistory[]
+  lineupsCreated Lineup[]  @relation("LineupCreatedBy")
+  instrumentAssignments InstrumentAssignment[]
+  singerAssignments     SingerAssignment[]
+  chatMessages   ChatMessage[]
+  notifications  Notification[]
+  prayersCreated Prayer[]     @relation("PrayerCreatedBy")
+}
+
+model ARF {
+  id            String   @id @default(cuid())
+  ministryId    String
+  eventName     String
+  requestedDate DateTime
+  what          String
+  when          String
+  where         String
+  why           String
+  justification String
+  status        String   @default("draft")
+  createdById   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  ministry      Ministry @relation(fields: [ministryId], references: [id], onDelete: Cascade)
+  createdBy     User     @relation("ARFCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvalHistory ApprovalHistory[]
+
+  @@index([ministryId])
+  @@index([status])
+  @@index([createdById])
+}
+
+model PRF {
+  id              String   @id @default(cuid())
+  ministryId      String
+  requestDate     DateTime
+  amountRequested Decimal  @db.Decimal(12, 2)
+  purpose         String
+  justification   String
+  status          String   @default("draft")
+  createdById     String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  ministry        Ministry @relation(fields: [ministryId], references: [id], onDelete: Cascade)
+  createdBy       User     @relation("PRFCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvalHistory ApprovalHistory[]
+
+  @@index([ministryId])
+  @@index([status])
+  @@index([createdById])
+}
+
+model ApprovalHistory {
+  id           String         @id @default(cuid())
+  requestType  RequestType
+  arfId        String?
+  prfId        String?
+  lineupId     String?
+  action       ApprovalAction
+  performedById String
+  comment      String?
+  createdAt    DateTime       @default(now())
+  arf          ARF?           @relation(fields: [arfId], references: [id], onDelete: Cascade)
+  prf          PRF?           @relation(fields: [prfId], references: [id], onDelete: Cascade)
+  lineup       Lineup?        @relation(fields: [lineupId], references: [id], onDelete: Cascade)
+  performedBy  User           @relation(fields: [performedById], references: [id], onDelete: Restrict)
+
+  @@index([arfId])
+  @@index([prfId])
+  @@index([lineupId])
+  @@index([performedById])
+}
+
+model Lineup {
+  id          String   @id @default(cuid())
+  eventName   String
+  date        DateTime
+  ministryId  String
+  createdById String
+  status      String   @default("Draft")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  ministry    Ministry @relation(fields: [ministryId], references: [id], onDelete: Cascade)
+  createdBy   User     @relation("LineupCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  songs       Song[]
+  instrumentAssignments InstrumentAssignment[]
+  singerAssignments     SingerAssignment[]
+  chatMessages   ChatMessage[]
+  approvalHistory ApprovalHistory[]
+  reminders       Reminder[]
+
+  @@index([ministryId])
+  @@index([date])
+  @@index([status])
+  @@index([createdById])
+}
+
+model Song {
+  id         String     @id @default(cuid())
+  lineupId   String
+  section    SongSection
+  title      String
+  youtubeLink String?
+  order      Int        @default(0)
+  createdAt  DateTime   @default(now())
+  lineup     Lineup     @relation(fields: [lineupId], references: [id], onDelete: Cascade)
+
+  @@index([lineupId])
+}
+
+model Instrument {
+  id        String   @id @default(cuid())
+  name      String
+  assignments InstrumentAssignment[]
+}
+
+model InstrumentAssignment {
+  lineupId     String
+  instrumentId String
+  userId       String
+  createdAt    DateTime @default(now())
+  lineup       Lineup    @relation(fields: [lineupId], references: [id], onDelete: Cascade)
+  instrument   Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([lineupId, instrumentId])
+}
+
+model SingerRole {
+  id          String   @id @default(cuid())
+  name        String
+  assignments SingerAssignment[]
+}
+
+model SingerAssignment {
+  lineupId     String
+  singerRoleId String
+  userId       String
+  createdAt    DateTime @default(now())
+  lineup       Lineup    @relation(fields: [lineupId], references: [id], onDelete: Cascade)
+  singerRole   SingerRole @relation(fields: [singerRoleId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([lineupId, singerRoleId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  lineupId  String
+  userId    String
+  body      String
+  createdAt DateTime @default(now())
+  lineup    Lineup   @relation(fields: [lineupId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([lineupId])
+  @@index([userId])
+}
+
+model Notification {
+  id         String   @id @default(cuid())
+  userId     String
+  type       String
+  title      String
+  body       String
+  link       String?
+  read       Boolean  @default(false)
+  ministryId String?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([read])
+}
+
+model Reminder {
+  id         String         @id @default(cuid())
+  userId     String?
+  entityType String
+  entityId   String
+  remindAt   DateTime
+  sent       Boolean        @default(false)
+  channel    ReminderChannel
+  createdAt  DateTime       @default(now())
+  lineupId   String?
+  lineup     Lineup?        @relation(fields: [lineupId], references: [id], onDelete: Cascade)
+
+  @@index([remindAt])
+  @@index([sent])
+}
+
+model EmailTemplate {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  subject   String
+  bodyHtml  String
+  bodyText  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Prayer {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  status      String   @default("pending")
+  createdById String
+  ministryId  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   User     @relation("PrayerCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  ministry    Ministry @relation(fields: [ministryId], references: [id], onDelete: Cascade)
+
+  @@index([createdById])
+  @@index([ministryId])
+  @@index([status])
+}
+
+model NotificationSetting {
+  id         String   @id @default(cuid())
+  roleId     String?
+  ministryId String?
+  eventType  String
+  inApp      Boolean  @default(true)
+  email      Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}

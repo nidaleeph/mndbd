@@ -1,0 +1,19 @@
+# Dependencies and build
+node_modules
+.next
+out
+build
+.turbo
+
+# Prisma
+prisma/migrations
+
+# Lock files
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+bun.lock
+
+# Generated
+*.min.js
+.next

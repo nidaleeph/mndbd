@@ -1,0 +1,528 @@
+Here is a **complete, cleaned-up master prompt** you can use (for Cursor / AI code generation / project spec). I organized everything clearly: goals, roles, UI system, pages, dashboard behavior, and how the system works. I also integrated all the features you requested.
+
+---
+
+# Church Ministry Management System – Full Project Prompt
+
+Build a **modern Church Ministry Management System** using:
+
+- React (latest)
+- Tailwind CSS
+- Custom component system (NO Flowbite or external UI kits)
+- React Icons
+- Responsive design (mobile-friendly for ministry leaders)
+
+The system must allow **admins and ministry heads** to organize church events, lineups, volunteers, and ministries efficiently.
+
+---
+
+# Design Theme
+
+Use a **church-appropriate theme**:
+
+Primary colors:
+
+- Light Blue (peace / trust)
+- Gold accents (church / sacred feel)
+- White background
+- Soft shadows and clean layout
+
+Design requirements:
+
+- Proper spacing (padding / margin consistent across pages)
+- Rounded cards
+- Clean typography
+- Accessible contrast
+- Mobile responsive
+- Desktop dashboard layout
+
+---
+
+# UI Component System (Custom)
+
+Create reusable components instead of using Flowbite.
+
+Components:
+
+Button
+
+- Variants: primary, secondary, outline, danger
+- Sizes: small, default, large
+- Disabled state
+- Loading state
+
+Input
+
+- Label
+- Placeholder
+- Validation support
+- Error message
+- Red border when invalid
+- Helper text
+
+Textarea
+
+Select Dropdown
+
+Checkbox
+
+Modal
+
+Card
+
+Badge
+
+Table
+
+Search Bar
+
+Date Picker
+
+Notification Toast
+
+Tabs
+
+Calendar Component
+
+Sidebar Navigation
+
+Header / Topbar
+
+---
+
+# Roles and Permissions
+
+Three main roles:
+
+Admin
+Ministry Head
+Regular User
+
+---
+
+## Admin Permissions
+
+Admins can:
+
+Manage ministries
+Create events
+Assign ministry heads
+Organize event lineups
+Approve lineup submissions
+View approval history
+View analytics dashboard
+Manage users
+Manage permissions
+Send notifications
+Access system settings
+
+Admins have **full system visibility**.
+
+---
+
+## Ministry Head Permissions
+
+Ministry heads can:
+
+Manage their own ministry only
+Create lineup drafts
+Submit lineup for approval
+Edit volunteers in their ministry
+Receive ministry-specific notifications
+View ministry dashboard
+View approval history for their ministry
+
+They **cannot access other ministries**.
+
+---
+
+## Regular Users
+
+Regular members can:
+
+View approved events
+View their assigned schedule
+Receive reminders
+See announcements
+
+They **cannot edit or manage anything**.
+
+---
+
+# Core Features
+
+## Event Management
+
+Admins create events like:
+
+Sunday Service
+Youth Service
+Prayer Meeting
+Special Events
+
+Event fields:
+
+- Event name
+- Date
+- Time
+- Ministries involved
+- Description
+- Status
+
+---
+
+## Calendar View
+
+Provide a **full calendar system**:
+
+Monthly view
+Weekly view
+Event markers
+Click event → open details
+
+Ministry heads can see:
+
+- Their ministry events
+
+Admins can see:
+
+- All events
+
+---
+
+## Lineup Builder
+
+Used for services like worship lineup.
+
+Example:
+
+Sunday Worship
+
+Opening Prayer
+Worship Leader
+Singers
+Musicians
+Scripture Reader
+Preacher
+
+Features:
+
+Drag and drop lineup
+Draft mode
+Save draft
+Submit for approval
+
+---
+
+## Draft Mode
+
+Ministry heads can:
+
+Save lineup drafts
+Edit drafts later
+Submit when ready
+
+Status:
+Draft
+Pending Approval
+Approved
+Rejected
+
+---
+
+## Approval Workflow
+
+Approval flow:
+
+Ministry Head → Submit → Admin Approval
+
+Admins can:
+
+Approve
+Reject
+Request changes
+
+---
+
+## Approval Workflow History
+
+Track everything.
+
+Show:
+
+Who submitted
+Who approved
+When it was approved
+Changes made
+
+Timeline style view.
+
+---
+
+# Smart Notifications
+
+Notifications must only go to **relevant ministries**.
+
+Examples:
+
+New Event Created
+Lineup Approved
+Lineup Rejected
+Reminder for Event
+New Volunteer Assignment
+
+Notification channels:
+
+Dashboard notifications
+In-app alerts
+Future support: Email / SMS
+
+---
+
+# Event Reminders
+
+Automatic reminders:
+
+1 day before
+3 hours before
+30 minutes before
+
+Users get notified if they are part of the event.
+
+---
+
+# Role-Based Dashboard Widgets
+
+Dashboard changes depending on role.
+
+---
+
+## Admin Dashboard
+
+Widgets:
+
+Upcoming Events
+Pending Approvals
+Ministry Activity
+System Stats
+Recent Notifications
+Calendar Overview
+
+Quick Actions:
+
+Create Event
+Manage Ministries
+Approve Lineups
+Add User
+
+---
+
+## Ministry Head Dashboard
+
+Widgets:
+
+My Ministry Events
+Pending Lineups
+Draft Lineups
+Volunteers List
+Upcoming Schedule
+
+Quick Actions:
+
+Create Lineup
+Edit Draft
+Submit for Approval
+
+---
+
+## User Dashboard
+
+Widgets:
+
+My Schedule
+Upcoming Events
+Announcements
+
+---
+
+# Navigation System
+
+Sidebar Navigation
+
+Admin Sidebar
+
+Dashboard
+Calendar
+Events
+Lineups
+Ministries
+Users
+Notifications
+Reports
+Settings
+
+---
+
+Ministry Head Sidebar
+
+Dashboard
+My Ministry
+Calendar
+Lineups
+Volunteers
+Notifications
+
+---
+
+Regular User Sidebar
+
+Dashboard
+My Schedule
+Events
+Announcements
+
+---
+
+# Search Across the System
+
+Global search must allow searching:
+
+Events
+Users
+Ministries
+Lineups
+
+Search bar in the top navigation.
+
+Fast filtering results.
+
+---
+
+# Mobile Friendly UI
+
+Ministry heads must be able to use the system on phone.
+
+Mobile features:
+
+Responsive sidebar
+Collapsible menu
+Touch friendly buttons
+Optimized forms
+Calendar mobile view
+
+---
+
+# Notification Center
+
+Bell icon in header.
+
+Dropdown showing:
+
+Recent notifications
+Unread markers
+Mark as read
+View all notifications page
+
+---
+
+# Pages to Build
+
+Public
+
+Homepage
+Login
+Register
+
+---
+
+System Pages
+
+Dashboard
+Calendar
+Events
+Lineup Builder
+Ministry Management
+Users Management
+Notifications
+Settings
+Reports
+
+---
+
+# Homepage (Complete Feature Set)
+
+Sections:
+
+Hero Section
+Upcoming Events
+Church Announcements
+Ministry Highlights
+Call to Action (Join Ministry)
+Footer
+
+Hero CTA buttons:
+
+View Events
+Join Ministry
+
+---
+
+# Dashboard Layout
+
+Header
+Sidebar
+Main Content
+Widgets
+Notification Bell
+User Profile Dropdown
+
+---
+
+# Technical Requirements
+
+State Management
+Use modern React patterns.
+
+Routing
+Use React Router.
+
+Form Handling
+Validation support.
+
+Component Structure
+
+/components
+/ui
+/layout
+/pages
+/features
+/hooks
+
+---
+
+# UI Spacing Rules
+
+Page padding consistent
+Card spacing uniform
+Buttons aligned properly
+Forms aligned with labels
+Grid layouts responsive
+
+Spacing scale:
+
+8px base system
+
+---
+
+# Suggested Additional Features (Recommended)
+
+These would make the system much better:
+
+Volunteer attendance tracking
+Service analytics
+Ministry performance reports
+Export lineup PDF
+QR check-in for volunteers
+Automated scheduling suggestions
+
+---
