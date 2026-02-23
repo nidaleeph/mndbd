@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, Suspense } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, Input, Card } from "@/components/ui";
 import { loginSchema, type LoginFormData } from "@/schemas/user";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
@@ -144,5 +144,19 @@ export default function LoginPage() {
         </p>
       </Card>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="p-page flex min-h-screen items-center justify-center bg-[var(--color-soft-blue-bg)]">
+          <p className="text-[var(--color-text-muted)]">Loading...</p>
+        </main>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }
