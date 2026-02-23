@@ -2,6 +2,10 @@
 
 A production-ready app for managing Sunday worship lineups, Activity Request Forms (ARF), Purchase Request Forms (PRF), ministries, members, notifications, and events.
 
+## Project Documentation
+
+For AI assistants and developers: **[docs/PROJECT_DOCUMENTATION.md](docs/PROJECT_DOCUMENTATION.md)** – full context on architecture, code standards, features, access rights, auth, and API reference. Feed this to AI before prompts for accurate project understanding.
+
 ## Tech Stack
 
 - Next.js 16 (App Router), TypeScript, Tailwind CSS, Framer Motion
