@@ -1,9 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { ExpandableTable } from "@/features/shared/ExpandableTable";
 import { FormActionsCell, type RowActions } from "@/features/shared/FormActionsCell";
 import { Badge } from "@/components/ui";
+import { useTableSearchFilterSort, DataTableToolbar } from "@/features/shared/table";
 
 type ARFWithRelations = {
   id: string;
@@ -20,11 +22,73 @@ type ARFWithRelations = {
   _actions?: RowActions;
 };
 
+const ARF_STATUS_OPTIONS = ["draft", "pending", "approved", "rejected"];
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+
 interface ARFTableClientProps {
   arfs: ARFWithRelations[];
 }
 
 export function ARFTableClient({ arfs }: ARFTableClientProps) {
+  const ministryOptions = useMemo(
+    () => [...new Set(arfs.map((r) => r.ministry.name).filter(Boolean))].sort(),
+    [arfs]
+  );
+  const createdByOptions = useMemo(
+    () => [...new Set(arfs.map((r) => r.createdBy.name).filter(Boolean))].sort(),
+    [arfs]
+  );
+
+  const tableConfig = useMemo(
+    () => ({
+      searchKeys: ["eventName", "ministry.name", "what", "where", "createdBy.name"] as const,
+      filterableColumns: {
+        ministry: {
+          accessor: (r: ARFWithRelations) => r.ministry.name,
+          options: ministryOptions,
+        },
+        status: {
+          accessor: (r: ARFWithRelations) => r.status,
+          options: ARF_STATUS_OPTIONS,
+        },
+        createdBy: {
+          accessor: (r: ARFWithRelations) => r.createdBy.name,
+          options: createdByOptions,
+        },
+      },
+      sortableColumns: {
+        eventName: { accessor: (r: ARFWithRelations) => r.eventName },
+        date: { accessor: (r: ARFWithRelations) => new Date(r.requestedDate).getTime() },
+        status: { accessor: (r: ARFWithRelations) => r.status },
+      },
+    }),
+    [ministryOptions, createdByOptions]
+  );
+
+  const {
+    filteredData,
+    search,
+    setSearch,
+    filters,
+    setFilter,
+    clearAllFilters,
+    sortColumn,
+    sortDirection,
+    setSort,
+    activeFilterCount,
+  } = useTableSearchFilterSort(arfs, tableConfig);
+
+  const filterableColumnOptions = useMemo(
+    () => ({
+      ministry: { options: ministryOptions },
+      status: { options: ARF_STATUS_OPTIONS, formatOption: capitalize },
+      createdBy: { options: createdByOptions },
+    }),
+    [ministryOptions, createdByOptions]
+  );
   const columns = [
     {
       id: "eventName",
@@ -131,12 +195,39 @@ export function ARFTableClient({ arfs }: ARFTableClientProps) {
   }
 
   return (
-    <ExpandableTable
-      columns={columns}
-      data={arfs}
-      keyExtractor={(row) => row.id}
-      renderDetail={renderDetail}
-      emptyMessage="No ARFs yet. Create one to get started."
-    />
+    <div className="overflow-hidden rounded-[var(--radius)] border border-[var(--color-border)]">
+      <DataTableToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search ARFs…"
+        activeFilterCount={activeFilterCount}
+        onClearFilters={clearAllFilters}
+      >
+        {activeFilterCount > 0 && (
+          <span className="text-sm text-[var(--color-text-muted)]">
+            {activeFilterCount} filter{activeFilterCount !== 1 ? "s" : ""} active
+          </span>
+        )}
+      </DataTableToolbar>
+      <ExpandableTable
+        columns={columns}
+        data={filteredData}
+        keyExtractor={(row) => row.id}
+        renderDetail={renderDetail}
+        emptyMessage="No ARFs yet. Create one to get started."
+        sortColumn={sortColumn}
+        sortDirection={sortDirection}
+        onSort={setSort}
+        sortableColumns={["eventName", "date", "status"]}
+        filters={filters}
+        onFilterChange={setFilter}
+        filterableColumns={{
+          ministry: filterableColumnOptions.ministry,
+          status: filterableColumnOptions.status,
+          createdBy: filterableColumnOptions.createdBy,
+        }}
+        embedded
+      />
+    </div>
   );
 }

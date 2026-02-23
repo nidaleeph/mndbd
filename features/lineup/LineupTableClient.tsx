@@ -1,9 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { ExpandableTable } from "@/features/shared/ExpandableTable";
 import { FormActionsCell, type RowActions } from "@/features/shared/FormActionsCell";
 import { Badge } from "@/components/ui";
+import { useTableSearchFilterSort, DataTableToolbar } from "@/features/shared/table";
 
 type SongType = {
   id: string;
@@ -37,11 +39,70 @@ type LineupWithRelations = {
   _actions?: RowActions;
 };
 
+const LINEUP_STATUS_OPTIONS = ["Draft", "Pending Approval", "Approved"];
+
 interface LineupTableClientProps {
   lineups: LineupWithRelations[];
 }
 
 export function LineupTableClient({ lineups }: LineupTableClientProps) {
+  const ministryOptions = useMemo(
+    () => [...new Set(lineups.map((r) => r.ministry.name).filter(Boolean))].sort(),
+    [lineups]
+  );
+  const createdByOptions = useMemo(
+    () => [...new Set(lineups.map((r) => r.createdBy.name).filter(Boolean))].sort(),
+    [lineups]
+  );
+
+  const tableConfig = useMemo(
+    () => ({
+      searchKeys: ["eventName", "ministry.name", "createdBy.name"] as const,
+      filterableColumns: {
+        ministry: {
+          accessor: (r: LineupWithRelations) => r.ministry.name,
+          options: ministryOptions,
+        },
+        status: {
+          accessor: (r: LineupWithRelations) => r.status,
+          options: LINEUP_STATUS_OPTIONS,
+        },
+        createdBy: {
+          accessor: (r: LineupWithRelations) => r.createdBy.name,
+          options: createdByOptions,
+        },
+      },
+      sortableColumns: {
+        eventName: { accessor: (r: LineupWithRelations) => r.eventName },
+        date: { accessor: (r: LineupWithRelations) => new Date(r.date).getTime() },
+        status: { accessor: (r: LineupWithRelations) => r.status },
+      },
+    }),
+    [ministryOptions, createdByOptions]
+  );
+
+  const {
+    filteredData,
+    search,
+    setSearch,
+    filters,
+    setFilter,
+    clearAllFilters,
+    sortColumn,
+    sortDirection,
+    setSort,
+    activeFilterCount,
+  } = useTableSearchFilterSort(lineups, tableConfig);
+
+  const filterableColumnOptions = useMemo(
+    () => ({
+      ministry: { options: ministryOptions },
+      status: { options: LINEUP_STATUS_OPTIONS },
+      createdBy: { options: createdByOptions },
+    }),
+    [ministryOptions, createdByOptions]
+  );
+
   const columns = [
     {
       id: "eventName",
@@ -209,12 +270,39 @@ export function LineupTableClient({ lineups }: LineupTableClientProps) {
   }
 
   return (
-    <ExpandableTable
-      columns={columns}
-      data={lineups}
-      keyExtractor={(row) => row.id}
-      renderDetail={renderDetail}
-      emptyMessage="No lineups yet."
-    />
+    <div className="overflow-hidden rounded-[var(--radius)] border border-[var(--color-border)]">
+      <DataTableToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search lineups…"
+        activeFilterCount={activeFilterCount}
+        onClearFilters={clearAllFilters}
+      >
+        {activeFilterCount > 0 && (
+          <span className="text-sm text-[var(--color-text-muted)]">
+            {activeFilterCount} filter{activeFilterCount !== 1 ? "s" : ""} active
+          </span>
+        )}
+      </DataTableToolbar>
+      <ExpandableTable
+        columns={columns}
+        data={filteredData}
+        keyExtractor={(row) => row.id}
+        renderDetail={renderDetail}
+        emptyMessage="No lineups yet."
+        sortColumn={sortColumn}
+        sortDirection={sortDirection}
+        onSort={setSort}
+        sortableColumns={["eventName", "date", "status"]}
+        filters={filters}
+        onFilterChange={setFilter}
+        filterableColumns={{
+          ministry: filterableColumnOptions.ministry,
+          status: filterableColumnOptions.status,
+          createdBy: filterableColumnOptions.createdBy,
+        }}
+        embedded
+      />
+    </div>
   );
 }

@@ -1,9 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { ExpandableTable } from "@/features/shared/ExpandableTable";
 import { FormActionsCell, type RowActions } from "@/features/shared/FormActionsCell";
 import { Badge } from "@/components/ui";
+import { useTableSearchFilterSort, DataTableToolbar } from "@/features/shared/table";
 
 type PRFWithRelations = {
   id: string;
@@ -17,11 +19,74 @@ type PRFWithRelations = {
   _actions?: RowActions;
 };
 
+const PRF_STATUS_OPTIONS = ["draft", "pending", "approved", "rejected"];
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+
 interface PRFTableClientProps {
   prfs: PRFWithRelations[];
 }
 
 export function PRFTableClient({ prfs }: PRFTableClientProps) {
+  const ministryOptions = useMemo(
+    () => [...new Set(prfs.map((r) => r.ministry.name).filter(Boolean))].sort(),
+    [prfs]
+  );
+  const createdByOptions = useMemo(
+    () => [...new Set(prfs.map((r) => r.createdBy.name).filter(Boolean))].sort(),
+    [prfs]
+  );
+
+  const tableConfig = useMemo(
+    () => ({
+      searchKeys: ["purpose", "ministry.name", "justification", "createdBy.name"] as const,
+      filterableColumns: {
+        ministry: {
+          accessor: (r: PRFWithRelations) => r.ministry.name,
+          options: ministryOptions,
+        },
+        status: {
+          accessor: (r: PRFWithRelations) => r.status,
+          options: PRF_STATUS_OPTIONS,
+        },
+        createdBy: {
+          accessor: (r: PRFWithRelations) => r.createdBy.name,
+          options: createdByOptions,
+        },
+      },
+      sortableColumns: {
+        purpose: { accessor: (r: PRFWithRelations) => r.purpose },
+        amount: { accessor: (r: PRFWithRelations) => Number(r.amountRequested) },
+        date: { accessor: (r: PRFWithRelations) => new Date(r.requestDate).getTime() },
+        status: { accessor: (r: PRFWithRelations) => r.status },
+      },
+    }),
+    [ministryOptions, createdByOptions]
+  );
+
+  const {
+    filteredData,
+    search,
+    setSearch,
+    filters,
+    setFilter,
+    clearAllFilters,
+    sortColumn,
+    sortDirection,
+    setSort,
+    activeFilterCount,
+  } = useTableSearchFilterSort(prfs, tableConfig);
+
+  const filterableColumnOptions = useMemo(
+    () => ({
+      ministry: { options: ministryOptions },
+      status: { options: PRF_STATUS_OPTIONS, formatOption: capitalize },
+      createdBy: { options: createdByOptions },
+    }),
+    [ministryOptions, createdByOptions]
+  );
   const columns = [
     {
       id: "purpose",
@@ -134,12 +199,39 @@ export function PRFTableClient({ prfs }: PRFTableClientProps) {
   }
 
   return (
-    <ExpandableTable
-      columns={columns}
-      data={prfs}
-      keyExtractor={(row) => row.id}
-      renderDetail={renderDetail}
-      emptyMessage="No PRFs yet. Create one to get started."
-    />
+    <div className="overflow-hidden rounded-[var(--radius)] border border-[var(--color-border)]">
+      <DataTableToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search PRFs…"
+        activeFilterCount={activeFilterCount}
+        onClearFilters={clearAllFilters}
+      >
+        {activeFilterCount > 0 && (
+          <span className="text-sm text-[var(--color-text-muted)]">
+            {activeFilterCount} filter{activeFilterCount !== 1 ? "s" : ""} active
+          </span>
+        )}
+      </DataTableToolbar>
+      <ExpandableTable
+        columns={columns}
+        data={filteredData}
+        keyExtractor={(row) => row.id}
+        renderDetail={renderDetail}
+        emptyMessage="No PRFs yet. Create one to get started."
+        sortColumn={sortColumn}
+        sortDirection={sortDirection}
+        onSort={setSort}
+        sortableColumns={["purpose", "amount", "date", "status"]}
+        filters={filters}
+        onFilterChange={setFilter}
+        filterableColumns={{
+          ministry: filterableColumnOptions.ministry,
+          status: filterableColumnOptions.status,
+          createdBy: filterableColumnOptions.createdBy,
+        }}
+        embedded
+      />
+    </div>
   );
 }

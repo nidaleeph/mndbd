@@ -9,6 +9,7 @@
 **Name**: Church Ministry Management System (mndbd)
 
 **Tech Stack**:
+
 - Next.js 16 (App Router), TypeScript, Tailwind CSS, Framer Motion
 - Prisma ORM, PostgreSQL
 - NextAuth (credentials provider), JWT sessions
@@ -106,9 +107,9 @@ hooks/                      # useDebounce
 ### 3.2 Session Shape
 
 ```ts
-session.userId      // string
-session.roleSlug   // "admin" | "ministry_head" | "user"
-session.ministryIds // string[] (from UserMinistry + User.ministryId)
+session.userId; // string
+session.roleSlug; // "admin" | "ministry_head" | "user"
+session.ministryIds; // string[] (from UserMinistry + User.ministryId)
 ```
 
 ### 3.3 Auth Flow
@@ -131,45 +132,45 @@ session.ministryIds // string[] (from UserMinistry + User.ministryId)
 
 ### 4.1 Roles
 
-| Role | Slug | Description |
-|------|------|-------------|
-| Admin | `admin` | Full system access |
-| Ministry Head | `ministry_head` | Own ministry only |
-| User | `user` | Regular member |
+| Role          | Slug            | Description        |
+| ------------- | --------------- | ------------------ |
+| Admin         | `admin`         | Full system access |
+| Ministry Head | `ministry_head` | Own ministry only  |
+| User          | `user`          | Regular member     |
 
 ### 4.2 Permission Helpers (`lib/permissions.ts`)
 
-| Function | Returns true when |
-|----------|-------------------|
-| `canAccessUsers` | admin, ministry_head |
-| `canAccessSettings` | admin only |
-| `canManageInstrumentsAndSingers` | admin, ministry_head |
-| `canAccessForms` | admin, ministry_head |
-| `canCreateARFOrPRF` | admin, ministry_head |
-| `canAccessLineup` | **always true** (everyone can view) |
-| `canCreateLineup` | admin OR user in Music ministry |
-| `canManageMinistry` | admin OR ministry_head of target ministry |
-| `canApproveLineup` | admin, ministry_head |
-| `canAccessPrayers` | always true |
-| `canSeeDraftLineup` | admin OR creator |
-| `canManagePrayer` | admin / creator / Parakletos head / Parakletos member (see Prayer section) |
-| `canViewAllPrayers` | admin OR Parakletos head OR Parakletos member |
+| Function                         | Returns true when                                                          |
+| -------------------------------- | -------------------------------------------------------------------------- |
+| `canAccessUsers`                 | admin, ministry_head                                                       |
+| `canAccessSettings`              | admin only                                                                 |
+| `canManageInstrumentsAndSingers` | admin, ministry_head                                                       |
+| `canAccessForms`                 | admin, ministry_head                                                       |
+| `canCreateARFOrPRF`              | admin, ministry_head                                                       |
+| `canAccessLineup`                | **always true** (everyone can view)                                        |
+| `canCreateLineup`                | admin OR user in Music ministry                                            |
+| `canManageMinistry`              | admin OR ministry_head of target ministry                                  |
+| `canApproveLineup`               | admin, ministry_head                                                       |
+| `canAccessPrayers`               | always true                                                                |
+| `canSeeDraftLineup`              | admin OR creator                                                           |
+| `canManagePrayer`                | admin / creator / Parakletos head / Parakletos member (see Prayer section) |
+| `canViewAllPrayers`              | admin OR Parakletos head OR Parakletos member                              |
 
 ### 4.3 Feature Access Matrix
 
-| Feature | Admin | Ministry Head | User |
-|---------|-------|---------------|------|
-| Dashboard | ✓ | ✓ | ✓ |
-| Forms (ARF/PRF) | ✓ | ✓ | ✗ |
-| Music Lineup (view) | ✓ | ✓ | ✓ |
-| Music Lineup (create) | ✓ | Music ministry only | Music ministry only |
-| Calendar | ✓ | ✓ | ✓ |
-| Prayers | ✓ | ✓ | ✓ |
-| Notifications | ✓ | ✓ | ✓ |
-| Users | ✓ | Own ministry | ✗ |
-| Reports | ✓ | ✗ | ✗ |
-| System Settings | ✓ | ✓ (Music setup) | ✗ |
-| Profile (self-edit) | ✓ | ✓ | ✓ |
+| Feature               | Admin | Ministry Head       | User                |
+| --------------------- | ----- | ------------------- | ------------------- |
+| Dashboard             | ✓     | ✓                   | ✓                   |
+| Forms (ARF/PRF)       | ✓     | ✓                   | ✗                   |
+| Music Lineup (view)   | ✓     | ✓                   | ✓                   |
+| Music Lineup (create) | ✓     | Music ministry only | Music ministry only |
+| Calendar              | ✓     | ✓                   | ✓                   |
+| Prayers               | ✓     | ✓                   | ✓                   |
+| Notifications         | ✓     | ✓                   | ✓                   |
+| Users                 | ✓     | Own ministry        | ✗                   |
+| Reports               | ✓     | ✗                   | ✗                   |
+| System Settings       | ✓     | ✓ (Music setup)     | ✗                   |
+| Profile (self-edit)   | ✓     | ✓                   | ✓                   |
 
 ### 4.4 Dashboard Layout
 
@@ -189,11 +190,13 @@ session.ministryIds // string[] (from UserMinistry + User.ministryId)
 **Status flow**: draft → pending → approved | rejected
 
 **Access**:
+
 - Create: admin, ministry_head
 - Draft: creator + admin can edit
 - Pending/Approved/Rejected: ministry head of that ministry or admin can approve/reject
 
 **Notifications**:
+
 - On create: admin + ministry members
 - On status change: admin + ministry members (exclude actor)
 
@@ -204,18 +207,21 @@ session.ministryIds // string[] (from UserMinistry + User.ministryId)
 **Status flow**: Draft → Pending Approval → Approved
 
 **Access**:
+
 - **View**: Everyone (all roles) can view the lineup list and detail
 - **Create**: Only Music ministry members or admin
 - **Draft**: Only creator and admin can see/edit
 - **Edit/Approve**: Admin or ministry head of Music ministry
 
 **Create flow**:
+
 - "Create as draft" or "Create lineup" (submit for approval)
 - Assign instruments and singers (from ministry users)
 
 **Chat**: Real-time (Pusher) per lineup. Participants = creator + musicians + singers. New messages notify participants.
 
 **Notifications**:
+
 - Lineup approved: creator + musicians + singers
 - Chat message: participant IDs (exclude sender)
 - Assignment: when user is assigned as musician/singer, they get notified
@@ -225,12 +231,14 @@ session.ministryIds // string[] (from UserMinistry + User.ministryId)
 **Parakletos** ministry: ministry slug `parakletos`
 
 **Access**:
+
 - Creator: can view, edit, delete; cannot set status
 - Parakletos ministry head: can view, delete, set status
 - Parakletos member: can view, set status (e.g. mark prayed)
 - Admin: full access
 
 **Notifications**:
+
 - On create: all Parakletos members
 - On "prayed for": creator
 
@@ -276,12 +284,14 @@ session.ministryIds // string[] (from UserMinistry + User.ministryId)
 ## 6. Database Schema (Summary)
 
 **Core models**:
+
 - `Role`, `Permission`, `RolePermission`
 - `User`, `Ministry`, `UserMinistry`
 - `ARF`, `PRF`, `Lineup`, `Song`, `Instrument`, `InstrumentAssignment`, `SingerRole`, `SingerAssignment`
 - `ApprovalHistory`, `ChatMessage`, `Notification`, `Reminder`, `Prayer`, `EmailTemplate`
 
 **Key enums**:
+
 - `RequestType`: ARF, PRF, LINEUP
 - `ApprovalAction`: approved, rejected
 - `SongSection`: Joyful, Solemn
@@ -331,6 +341,7 @@ session.ministryIds // string[] (from UserMinistry + User.ministryId)
 ## 8. Real-Time (Pusher)
 
 **Channels**:
+
 - `notifications-{userId}` – event `notification` (payload: id, type, title, body, link, ministryId, createdAt)
 - `chat-{lineupId}` – event `message` (payload: id, body, userId, userName, createdAt)
 
@@ -357,20 +368,20 @@ ADMIN_EMAIL, ADMIN_PASSWORD  (optional, for db seed)
 
 ## 10. Key File Reference
 
-| Purpose | File |
-|---------|------|
-| Auth config | `lib/auth.ts` |
-| Permissions | `lib/permissions.ts` |
-| Notification recipients | `lib/notificationRecipients.ts` |
-| Create notifications | `services/notificationService.ts` |
-| ARF schema | `schemas/arf.ts` |
-| PRF schema | `schemas/prf.ts` |
-| Lineup schema | `schemas/lineup.ts` |
-| User schema | `schemas/user.ts` |
-| Profile schema | `schemas/profile.ts` |
-| Prayer schema | `schemas/prayer.ts` |
-| Dashboard layout | `app/(dashboard)/layout.tsx` |
-| Sidebar nav | `components/layout/Sidebar.tsx` |
+| Purpose                 | File                              |
+| ----------------------- | --------------------------------- |
+| Auth config             | `lib/auth.ts`                     |
+| Permissions             | `lib/permissions.ts`              |
+| Notification recipients | `lib/notificationRecipients.ts`   |
+| Create notifications    | `services/notificationService.ts` |
+| ARF schema              | `schemas/arf.ts`                  |
+| PRF schema              | `schemas/prf.ts`                  |
+| Lineup schema           | `schemas/lineup.ts`               |
+| User schema             | `schemas/user.ts`                 |
+| Profile schema          | `schemas/profile.ts`              |
+| Prayer schema           | `schemas/prayer.ts`               |
+| Dashboard layout        | `app/(dashboard)/layout.tsx`      |
+| Sidebar nav             | `components/layout/Sidebar.tsx`   |
 
 ---
 
@@ -385,35 +396,35 @@ ADMIN_EMAIL, ADMIN_PASSWORD  (optional, for db seed)
 
 ## 12. API Routes Quick Reference
 
-| Route | Methods | Auth | Purpose |
-|-------|---------|------|---------|
-| `/api/auth/register` | POST | Public | Sign up |
-| `/api/auth/[...nextauth]` | * | NextAuth | Login, session |
-| `/api/profile` | GET, PUT | Session | Own profile |
-| `/api/users` | GET, POST | canAccessUsers | List, create users |
-| `/api/users/[id]` | GET, PUT, DELETE | canAccessUsers | User CRUD |
-| `/api/forms/arf` | GET, POST | canAccessForms | ARF list, create |
-| `/api/forms/arf/[id]` | GET, PUT | Role-based | ARF detail, update |
-| `/api/forms/arf/[id]/pdf` | GET | Role-based | ARF PDF |
-| `/api/forms/prf` | GET, POST | canAccessForms | PRF list, create |
-| `/api/forms/prf/[id]` | GET, PUT | Role-based | PRF detail, update |
-| `/api/forms/prf/[id]/pdf` | GET | Role-based | PRF PDF |
-| `/api/lineup` | GET, POST | Session, canCreateLineup | Lineup list, create |
-| `/api/lineup/[id]` | GET, PUT, PATCH, DELETE | Session, role-based | Lineup CRUD |
-| `/api/lineup/[id]/chat` | GET, POST | Session, canSeeDraftLineup | Chat messages |
-| `/api/lineup/[id]/instruments` | POST, DELETE | canSeeDraftLineup | Assign instruments |
-| `/api/lineup/[id]/singers` | POST, DELETE | canSeeDraftLineup | Assign singers |
-| `/api/prayers` | GET, POST | Session | Prayer list, create |
-| `/api/prayers/[id]` | GET, PUT, PATCH, DELETE | canManagePrayer | Prayer CRUD |
-| `/api/options/ministries` | GET | Session | Ministries for dropdowns |
-| `/api/options/roles` | GET | Session | Roles for dropdowns |
-| `/api/options/users` | GET | Session | Users for dropdowns |
-| `/api/settings/ministries` | GET, POST, PUT, DELETE | canAccessSettings | Ministry CRUD |
-| `/api/settings/instruments` | GET, POST, PUT, DELETE | canManageInstrumentsAndSingers | Instrument CRUD |
-| `/api/settings/singer-roles` | GET, POST, PUT, DELETE | canManageInstrumentsAndSingers | Singer role CRUD |
-| `/api/notifications/read` | POST | Session | Mark notification read |
-| `/api/search` | GET | Session | Global search |
-| `/api/cron/reminders` | GET | Cron secret | Trigger reminders |
+| Route                          | Methods                 | Auth                           | Purpose                  |
+| ------------------------------ | ----------------------- | ------------------------------ | ------------------------ |
+| `/api/auth/register`           | POST                    | Public                         | Sign up                  |
+| `/api/auth/[...nextauth]`      | \*                      | NextAuth                       | Login, session           |
+| `/api/profile`                 | GET, PUT                | Session                        | Own profile              |
+| `/api/users`                   | GET, POST               | canAccessUsers                 | List, create users       |
+| `/api/users/[id]`              | GET, PUT, DELETE        | canAccessUsers                 | User CRUD                |
+| `/api/forms/arf`               | GET, POST               | canAccessForms                 | ARF list, create         |
+| `/api/forms/arf/[id]`          | GET, PUT                | Role-based                     | ARF detail, update       |
+| `/api/forms/arf/[id]/pdf`      | GET                     | Role-based                     | ARF PDF                  |
+| `/api/forms/prf`               | GET, POST               | canAccessForms                 | PRF list, create         |
+| `/api/forms/prf/[id]`          | GET, PUT                | Role-based                     | PRF detail, update       |
+| `/api/forms/prf/[id]/pdf`      | GET                     | Role-based                     | PRF PDF                  |
+| `/api/lineup`                  | GET, POST               | Session, canCreateLineup       | Lineup list, create      |
+| `/api/lineup/[id]`             | GET, PUT, PATCH, DELETE | Session, role-based            | Lineup CRUD              |
+| `/api/lineup/[id]/chat`        | GET, POST               | Session, canSeeDraftLineup     | Chat messages            |
+| `/api/lineup/[id]/instruments` | POST, DELETE            | canSeeDraftLineup              | Assign instruments       |
+| `/api/lineup/[id]/singers`     | POST, DELETE            | canSeeDraftLineup              | Assign singers           |
+| `/api/prayers`                 | GET, POST               | Session                        | Prayer list, create      |
+| `/api/prayers/[id]`            | GET, PUT, PATCH, DELETE | canManagePrayer                | Prayer CRUD              |
+| `/api/options/ministries`      | GET                     | Session                        | Ministries for dropdowns |
+| `/api/options/roles`           | GET                     | Session                        | Roles for dropdowns      |
+| `/api/options/users`           | GET                     | Session                        | Users for dropdowns      |
+| `/api/settings/ministries`     | GET, POST, PUT, DELETE  | canAccessSettings              | Ministry CRUD            |
+| `/api/settings/instruments`    | GET, POST, PUT, DELETE  | canManageInstrumentsAndSingers | Instrument CRUD          |
+| `/api/settings/singer-roles`   | GET, POST, PUT, DELETE  | canManageInstrumentsAndSingers | Singer role CRUD         |
+| `/api/notifications/read`      | POST                    | Session                        | Mark notification read   |
+| `/api/search`                  | GET                     | Session                        | Global search            |
+| `/api/cron/reminders`          | GET                     | Cron secret                    | Trigger reminders        |
 
 ---
 
@@ -428,4 +439,4 @@ ADMIN_EMAIL, ADMIN_PASSWORD  (optional, for db seed)
 
 ---
 
-*End of Project Documentation. Use this as context before making changes or answering questions about the project.*
+_End of Project Documentation. Use this as context before making changes or answering questions about the project._

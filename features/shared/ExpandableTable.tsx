@@ -3,6 +3,8 @@
 import type { ReactNode } from "react";
 import { Fragment, useState, useCallback } from "react";
 import { FiChevronRight, FiChevronDown } from "react-icons/fi";
+import { SortableHeader, type SortDirection } from "@/features/shared/table/SortableHeader";
+import { ColumnFilterDropdown } from "@/features/shared/table/ColumnFilterDropdown";
 
 export interface ExpandableTableColumn<T> {
   id: string;
@@ -17,6 +19,17 @@ export interface ExpandableTableProps<T> {
   renderDetail: (row: T) => ReactNode;
   emptyMessage?: string;
   className?: string;
+  /** Optional: enable sortable column headers */
+  sortColumn?: string | null;
+  sortDirection?: SortDirection;
+  onSort?: (columnId: string) => void;
+  sortableColumns?: string[];
+  /** Optional: enable per-column multi-select filters */
+  filters?: Record<string, string[]>;
+  onFilterChange?: (columnId: string, values: string[]) => void;
+  filterableColumns?: Record<string, { options: string[]; formatOption?: (v: string) => string }>;
+  /** When true, omit border/rounded (parent provides container) */
+  embedded?: boolean;
 }
 
 /**
@@ -30,6 +43,14 @@ export function ExpandableTable<T>({
   renderDetail,
   emptyMessage = "No data",
   className = "",
+  sortColumn = null,
+  sortDirection = null,
+  onSort,
+  sortableColumns,
+  filters = {},
+  onFilterChange,
+  filterableColumns,
+  embedded = false,
 }: ExpandableTableProps<T>) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -47,23 +68,69 @@ export function ExpandableTable<T>({
     [toggleExpand]
   );
 
+  const isSortable = Boolean(onSort && sortableColumns?.length);
+  const isFilterable = Boolean(onFilterChange && filterableColumns);
+
   return (
     <div
-      className={`overflow-x-auto rounded-[var(--radius)] border border-[var(--color-border)] ${className}`}
+      className={`overflow-x-auto ${embedded ? "" : "rounded-[var(--radius)] border border-[var(--color-border)]"} ${className}`}
     >
       <table className="w-full min-w-[400px] text-left text-sm">
         <thead className="border-b border-[var(--color-border)] bg-[var(--color-soft-blue-bg)]">
           <tr>
             <th scope="col" className="w-10 px-2 py-3" aria-label="Expand" />
-            {columns.map((col) => (
-              <th
-                key={col.id}
-                scope="col"
-                className="px-4 py-3 font-medium text-[var(--color-text-dark)]"
-              >
-                {col.header}
-              </th>
-            ))}
+            {columns.map((col) => {
+              const canSort = isSortable && sortableColumns!.includes(col.id);
+              const filterConfig = isFilterable ? filterableColumns![col.id] : undefined;
+              const filterSlot = filterConfig ? (
+                <ColumnFilterDropdown
+                  columnId={col.id}
+                  columnLabel={col.header}
+                  options={filterConfig.options}
+                  selectedValues={filters[col.id] ?? []}
+                  onSelectionChange={onFilterChange!}
+                  formatOption={filterConfig.formatOption}
+                />
+              ) : undefined;
+
+              if (canSort) {
+                return (
+                  <SortableHeader
+                    key={col.id}
+                    columnId={col.id}
+                    label={col.header}
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSort={onSort!}
+                    filterSlot={filterSlot}
+                  />
+                );
+              }
+              if (filterConfig) {
+                return (
+                  <th
+                    key={col.id}
+                    scope="col"
+                    className="px-4 py-3 font-medium text-[var(--color-text-dark)]"
+                  >
+                    <div className="flex min-w-0 items-center gap-1">
+                      <span className="min-w-0 truncate">{col.header}</span>
+                      {filterSlot}
+                    </div>
+                  </th>
+                );
+              }
+              const isActions = col.id === "actions";
+              return (
+                <th
+                  key={col.id}
+                  scope="col"
+                  className={`px-4 py-3 font-medium text-[var(--color-text-dark)] ${isActions ? "w-24" : ""}`}
+                >
+                  {col.header}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody className="divide-y divide-[var(--color-border)]">
@@ -99,11 +166,17 @@ export function ExpandableTable<T>({
                         )}
                       </button>
                     </td>
-                    {columns.map((col) => (
-                      <td key={col.id} className="px-4 py-3 text-[var(--color-text-dark)]">
-                        {col.cell(row)}
-                      </td>
-                    ))}
+                    {columns.map((col) => {
+                      const isActions = col.id === "actions";
+                      return (
+                        <td
+                          key={col.id}
+                          className={`px-4 py-3 text-[var(--color-text-dark)] ${isActions ? "w-24" : ""}`}
+                        >
+                          {col.cell(row)}
+                        </td>
+                      );
+                    })}
                   </tr>
                   {isExpanded && (
                     <tr key={`${id}-detail`}>
