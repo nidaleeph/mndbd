@@ -276,20 +276,26 @@ export function LineupAssignmentsClient({
             </p>
           )}
           <div className="mt-4 flex flex-wrap items-end gap-3">
-            <div className="min-w-[140px]">
+            <div className="min-w-[200px]">
               <Select
                 label="Instrument"
                 options={instruments}
                 value={selectedInstrumentId}
                 onChange={handleInstrumentChange}
+                placeholder="Search instruments…"
+                searchable
+                searchPlaceholder="Search instruments…"
               />
             </div>
-            <div className="min-w-[200px]">
+            <div className="min-w-[280px]">
               <Select
                 label="Musician"
                 options={users}
                 value={selectedMusicianUserId}
                 onChange={handleMusicianUserChange}
+                placeholder="Search musicians…"
+                searchable
+                searchPlaceholder="Search musicians…"
               />
             </div>
             <Button
@@ -330,20 +336,26 @@ export function LineupAssignmentsClient({
             </p>
           )}
           <div className="mt-4 flex flex-wrap items-end gap-3">
-            <div className="min-w-[140px]">
+            <div className="min-w-[200px]">
               <Select
                 label="Singer role"
                 options={singerRoles}
                 value={selectedSingerRoleId}
                 onChange={handleSingerRoleChange}
+                placeholder="Search roles…"
+                searchable
+                searchPlaceholder="Search roles…"
               />
             </div>
-            <div className="min-w-[200px]">
+            <div className="min-w-[280px]">
               <Select
                 label="Singer"
                 options={users}
                 value={selectedSingerUserId}
                 onChange={handleSingerUserChange}
+                placeholder="Search singers…"
+                searchable
+                searchPlaceholder="Search singers…"
               />
             </div>
             <Button
