@@ -41,7 +41,8 @@ export default async function LineupDetailPage({ params }: { params: Promise<{ i
   if (lineup.ministryId !== musicMinistry.id) notFound();
   if (
     lineup.status === "Draft" &&
-    !canSeeDraftLineup(roleSlug, lineup.createdById, lineup.ministryId, userId, ministryIds)
+    !canSeeDraftLineup(roleSlug, lineup.createdById, lineup.ministryId, userId, ministryIds) &&
+    !canManageMinistry(roleSlug, ministryIds, lineup.ministryId)
   ) {
     notFound();
   }
@@ -52,13 +53,9 @@ export default async function LineupDetailPage({ params }: { params: Promise<{ i
     include: { performedBy: { select: { name: true } } },
   });
 
-  const canEdit = canSeeDraftLineup(
-    roleSlug,
-    lineup.createdById,
-    lineup.ministryId,
-    userId,
-    ministryIds
-  );
+  const canEdit =
+    canSeeDraftLineup(roleSlug, lineup.createdById, lineup.ministryId, userId, ministryIds) ||
+    canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
   const canApprove = canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
   const statusActions: Array<"submit" | "approve"> =
     lineup.status === "Draft" && canEdit

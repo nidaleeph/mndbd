@@ -36,10 +36,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (musicMinistry && lineup.ministryId !== musicMinistry.id && roleSlug !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (
-    lineup.status === "Draft" &&
-    !canSeeDraftLineup(roleSlug, lineup.createdById, lineup.ministryId, session.userId, ministryIds)
-  ) {
+  const canAccessDraft =
+    canSeeDraftLineup(roleSlug, lineup.createdById, lineup.ministryId, session.userId, ministryIds) ||
+    canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
+  if (lineup.status === "Draft" && !canAccessDraft) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   return NextResponse.json({
@@ -60,13 +60,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
   const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
   const ministryIds = (session as { ministryIds?: string[] }).ministryIds ?? [];
-  const canEditDraft = canSeeDraftLineup(
-    roleSlug,
-    existing.createdById,
-    existing.ministryId,
-    session.userId,
-    ministryIds
-  );
+  const canEditDraft =
+    canSeeDraftLineup(roleSlug, existing.createdById, existing.ministryId, session.userId, ministryIds) ||
+    canManageMinistry(roleSlug, ministryIds, existing.ministryId);
   const canEditNonDraft = canManageMinistry(roleSlug, ministryIds, existing.ministryId);
   const canEdit = existing.status === "Draft" ? canEditDraft : canEditNonDraft;
   if (!canEdit) {
@@ -219,13 +215,9 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const canEditDraft = canSeeDraftLineup(
-    roleSlug,
-    existing.createdById,
-    existing.ministryId,
-    session.userId,
-    ministryIds
-  );
+  const canEditDraft =
+    canSeeDraftLineup(roleSlug, existing.createdById, existing.ministryId, session.userId, ministryIds) ||
+    canManageMinistry(roleSlug, ministryIds, existing.ministryId);
   const canEditNonDraft = canManageMinistry(roleSlug, ministryIds, existing.ministryId);
   const canEdit = existing.status === "Draft" ? canEditDraft : canEditNonDraft;
   if (!canEdit) {

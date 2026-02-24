@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { RoleSlug } from "@/lib/permissions";
-import { canSeeDraftLineup } from "@/lib/permissions";
+import { canManageMinistry, canSeeDraftLineup } from "@/lib/permissions";
 import { createNotification } from "@/services/notificationService";
 
 async function checkLineupEditAccess(
@@ -14,9 +14,10 @@ async function checkLineupEditAccess(
   if (!lineup) return { error: "Not found" as const, status: 404 as const };
   const roleSlug = (session.roleSlug ?? "user") as RoleSlug;
   const ministryIds = session.ministryIds ?? [];
-  if (
-    !canSeeDraftLineup(roleSlug, lineup.createdById, lineup.ministryId, session.userId, ministryIds)
-  ) {
+  const canEdit =
+    canSeeDraftLineup(roleSlug, lineup.createdById, lineup.ministryId, session.userId, ministryIds) ||
+    canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
+  if (!canEdit) {
     return { error: "Forbidden" as const, status: 403 as const };
   }
   return { lineup };

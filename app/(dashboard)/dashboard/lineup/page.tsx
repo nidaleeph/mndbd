@@ -43,18 +43,19 @@ export default async function LineupListPage() {
       },
     },
   });
-  // Ministry heads do NOT see drafts; only creator and admin see drafts
+  // Drafts: admin, creator, or ministry head of music can see. Non-drafts: everyone sees.
   const filtered = all.filter((l) => {
     if (l.status !== "Draft") return true;
-    if (roleSlug === "ministry_head") return false;
     if (roleSlug === "admin") return true;
-    return l.createdById === userId;
+    if (l.createdById === userId) return true;
+    if (canManageMinistry(roleSlug, ministryIds, l.ministryId)) return true;
+    return false;
   });
 
   const lineups = filtered.map((l) => {
     const canEdit =
       roleSlug === "admin" ||
-      (l.status === "Draft" && l.createdById === userId) ||
+      (l.status === "Draft" && (l.createdById === userId || canManageMinistry(roleSlug, ministryIds, l.ministryId))) ||
       (l.status !== "Draft" && canManageMinistry(roleSlug, ministryIds, l.ministryId));
     const canApprove = canManageMinistry(roleSlug, ministryIds, l.ministryId);
     const statusActions: Array<"submit" | "approve"> =

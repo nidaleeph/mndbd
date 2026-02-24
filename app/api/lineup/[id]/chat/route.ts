@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getPusher, getPusherChannelName } from "@/lib/pusher";
 import type { RoleSlug } from "@/lib/permissions";
-import { canSeeDraftLineup } from "@/lib/permissions";
+import { canManageMinistry, canSeeDraftLineup } from "@/lib/permissions";
 import { getLineupParticipantIds } from "@/lib/notificationRecipients";
 import { createNotificationsForUserIds } from "@/services/notificationService";
 
@@ -20,10 +20,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
   const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
   const ministryIds = (session as { ministryIds?: string[] }).ministryIds ?? [];
-  if (
-    lineup.status === "Draft" &&
-    !canSeeDraftLineup(roleSlug, lineup.createdById, lineup.ministryId, session.userId, ministryIds)
-  ) {
+  const canAccessDraft =
+    canSeeDraftLineup(roleSlug, lineup.createdById, lineup.ministryId, session.userId, ministryIds) ||
+    canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
+  if (lineup.status === "Draft" && !canAccessDraft) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const messages = await prisma.chatMessage.findMany({
@@ -54,10 +54,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
   const ministryIds = (session as { ministryIds?: string[] }).ministryIds ?? [];
-  if (
-    lineup.status === "Draft" &&
-    !canSeeDraftLineup(roleSlug, lineup.createdById, lineup.ministryId, session.userId, ministryIds)
-  ) {
+  const canAccessDraft =
+    canSeeDraftLineup(roleSlug, lineup.createdById, lineup.ministryId, session.userId, ministryIds) ||
+    canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
+  if (lineup.status === "Draft" && !canAccessDraft) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const body = await request.json().catch(() => ({}));

@@ -15,13 +15,9 @@ export default async function EditLineupPage({ params }: { params: Promise<{ id:
   const ministryIds = (session as { ministryIds?: string[] })?.ministryIds ?? [];
   const lineup = await prisma.lineup.findUnique({ where: { id } });
   if (!lineup) redirect("/dashboard/lineup");
-  const canEditDraft = canSeeDraftLineup(
-    roleSlug,
-    lineup.createdById,
-    lineup.ministryId,
-    userId,
-    ministryIds
-  );
+  const canEditDraft =
+    canSeeDraftLineup(roleSlug, lineup.createdById, lineup.ministryId, userId, ministryIds) ||
+    canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
   const canEditNonDraft = canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
   const canEdit = lineup.status === "Draft" ? canEditDraft : canEditNonDraft;
   if (!canEdit) redirect("/dashboard/lineup");
