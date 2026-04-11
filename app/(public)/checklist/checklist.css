@@ -29,6 +29,155 @@
   padding: 28px 24px 64px;
 }
 
+/* ---------- Header bar (top navigation) ---------- */
+
+.checklist-root .cl-header {
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--cl-border);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  backdrop-filter: blur(8px);
+}
+.checklist-root .cl-header-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.checklist-root .cl-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--cl-mono);
+  font-size: 13px;
+  color: var(--cl-text);
+  text-decoration: none;
+  font-weight: 600;
+}
+.checklist-root .cl-header-brand-prefix {
+  color: var(--cl-cyan);
+}
+.checklist-root .cl-header-brand-name {
+  letter-spacing: 0.03em;
+}
+.checklist-root .cl-header-brand:hover {
+  color: var(--cl-cyan);
+}
+
+.checklist-root .cl-header-signin {
+  font-family: var(--cl-mono);
+  font-size: 11px;
+  color: var(--cl-cyan);
+  text-decoration: none;
+  border: 1px solid var(--cl-cyan-border);
+  padding: 6px 12px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+.checklist-root .cl-header-signin:hover {
+  background: var(--cl-cyan-dim);
+}
+
+/* ---------- User menu dropdown ---------- */
+
+.checklist-root .cl-user-menu {
+  position: relative;
+}
+.checklist-root .cl-user-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid var(--cl-border-hi);
+  border-radius: 6px;
+  padding: 5px 10px 5px 5px;
+  color: var(--cl-text);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  transition: all 0.15s;
+}
+.checklist-root .cl-user-trigger:hover {
+  border-color: var(--cl-cyan-border);
+  background: var(--cl-cyan-dim);
+}
+.checklist-root .cl-user-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--cl-cyan);
+  color: var(--bg-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--cl-mono);
+  flex-shrink: 0;
+}
+.checklist-root .cl-user-name {
+  font-weight: 500;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.checklist-root .cl-user-caret {
+  color: var(--cl-text-dim);
+  font-size: 10px;
+}
+
+.checklist-root .cl-user-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 200px;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--cl-border-hi);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  z-index: 40;
+}
+.checklist-root .cl-user-dropdown-meta {
+  padding: 10px 14px;
+  font-size: 10px;
+  color: var(--cl-text-dimmer);
+  font-family: var(--cl-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--cl-border);
+}
+.checklist-root .cl-user-dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 10px 14px;
+  color: var(--cl-text);
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: none;
+}
+.checklist-root .cl-user-dropdown-item:hover {
+  background: var(--cl-cyan-dim);
+  color: var(--cl-cyan);
+}
+.checklist-root .cl-user-dropdown-signout {
+  border-top: 1px solid var(--cl-border);
+  color: var(--cl-red);
+}
+.checklist-root .cl-user-dropdown-signout:hover {
+  background: rgba(248, 113, 113, 0.1);
+  color: var(--cl-red);
+}
+
 .checklist-root .cl-topbar {
   display: flex;
   justify-content: space-between;

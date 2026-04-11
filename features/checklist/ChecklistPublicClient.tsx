@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { signOut } from "next-auth/react";
 import Pusher from "pusher-js";
 import { CelebrationOverlay } from "./CelebrationOverlay";
 
@@ -213,6 +215,7 @@ export function ChecklistPublicClient({
   if (!liveTemplate || !liveRun) {
     return (
       <div className="checklist-root">
+        <ChecklistHeader currentUserName={currentUserName} canCheck={canCheck} />
         <div className="cl-container">
           <div className="cl-topbar">
             <div className="cl-brand">
@@ -233,6 +236,7 @@ export function ChecklistPublicClient({
 
   return (
     <div className={canCheck ? "checklist-root can-check" : "checklist-root"}>
+      <ChecklistHeader currentUserName={currentUserName} canCheck={canCheck} />
       <div className="cl-container">
         <div className="cl-topbar">
           <div className="cl-brand">
@@ -316,5 +320,113 @@ export function ChecklistPublicClient({
         <CelebrationOverlay runId={liveRun.id} active={is100} />
       </div>
     </div>
+  );
+}
+
+// ============================================================================
+// ChecklistHeader — top navigation bar shown above the public checklist page.
+// Anonymous: minimal brand + Sign in link.
+// Logged in: brand + user dropdown (Dashboard / My profile / Sign out).
+// ============================================================================
+
+function ChecklistHeader({
+  currentUserName,
+  canCheck,
+}: {
+  currentUserName: string | null;
+  canCheck: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    function onClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  const initials = currentUserName
+    ? currentUserName
+        .split(/\s+/)
+        .map((part) => part[0])
+        .filter(Boolean)
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
+    : "?";
+
+  return (
+    <header className="cl-header">
+      <div className="cl-header-inner">
+        <Link href="/checklist" className="cl-header-brand">
+          <span className="cl-header-brand-prefix">{"//"}</span>
+          <span className="cl-header-brand-name">Multimedia Checklist</span>
+        </Link>
+
+        {currentUserName ? (
+          <div className="cl-user-menu" ref={ref}>
+            <button
+              type="button"
+              className="cl-user-trigger"
+              onClick={() => setOpen((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={open}
+            >
+              <span className="cl-user-avatar" aria-hidden>
+                {initials}
+              </span>
+              <span className="cl-user-name">{currentUserName}</span>
+              <span className="cl-user-caret" aria-hidden>
+                ▾
+              </span>
+            </button>
+            {open ? (
+              <div className="cl-user-dropdown" role="menu">
+                <div className="cl-user-dropdown-meta">
+                  Signed in{canCheck ? " · Multimedia" : ""}
+                </div>
+                <Link
+                  href="/dashboard"
+                  className="cl-user-dropdown-item"
+                  onClick={() => setOpen(false)}
+                  role="menuitem"
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  href="/dashboard/profile"
+                  className="cl-user-dropdown-item"
+                  onClick={() => setOpen(false)}
+                  role="menuitem"
+                >
+                  My profile
+                </Link>
+                <button
+                  type="button"
+                  className="cl-user-dropdown-item cl-user-dropdown-signout"
+                  onClick={() => {
+                    setOpen(false);
+                    signOut({ callbackUrl: "/login" });
+                  }}
+                  role="menuitem"
+                >
+                  Sign out
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <Link href="/login?callbackUrl=/checklist" className="cl-header-signin">
+            Sign in
+          </Link>
+        )}
+      </div>
+    </header>
   );
 }
