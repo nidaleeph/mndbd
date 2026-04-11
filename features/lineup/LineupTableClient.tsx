@@ -6,6 +6,7 @@ import { ExpandableTable } from "@/features/shared/ExpandableTable";
 import { FormActionsCell, type RowActions } from "@/features/shared/FormActionsCell";
 import { Badge } from "@/components/ui";
 import { useTableSearchFilterSort, DataTableToolbar } from "@/features/shared/table";
+import { formatManilaDate } from "@/lib/dates";
 
 type SongType = {
   id: string;
@@ -124,7 +125,7 @@ export function LineupTableClient({ lineups }: LineupTableClientProps) {
     {
       id: "date",
       header: "Date",
-      cell: (row: LineupWithRelations) => new Date(row.date).toLocaleDateString(),
+      cell: (row: LineupWithRelations) => formatManilaDate(row.date),
     },
     {
       id: "status",

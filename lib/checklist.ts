@@ -45,26 +45,26 @@ export async function getParakletosMinistryId(): Promise<string | null> {
 }
 
 /**
- * Compute the next Sunday >= now in Asia/Manila, truncated to 00:00:00.
+ * Compute the Sunday of the current week in Asia/Manila, truncated to 00:00:00.
  * Returns a UTC Date whose wall-clock equivalent in Asia/Manila is Sunday 00:00.
  *
- * Logic: get today's date in Manila, find the current day-of-week, add days
- * until we land on Sunday (0). If today is Sunday past 00:00 Manila, "next Sunday"
- * means 7 days later — see spec §8.1 step 1.
+ * Logic:
+ *   - If today is Sunday (any time of day) → today
+ *   - If today is Mon–Sat → the upcoming Sunday (1–6 days away)
+ *
+ * Cron usage: cron runs Monday 03:00 Manila and gets the upcoming Sunday
+ * (6 days away, the next service day). Manual "Start new week" button on
+ * Sunday gets today; on any other day gets the upcoming Sunday.
  */
-export function computeUpcomingSundayManila(now: Date = new Date()): Date {
+export function computeCurrentWeekSundayManila(now: Date = new Date()): Date {
   const parts = getManilaParts(now);
   // Build a Date from the Manila wall-clock via UTC so system TZ doesn't matter.
   const manilaMidnightUtc = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 0, 0, 0, 0));
   const day = manilaMidnightUtc.getUTCDay(); // 0 = Sunday
-  // If it's exactly Sunday 00:00 Manila, use today; otherwise advance to the next Sunday.
-  let daysToAdd: number;
-  if (day === 0 && parts.hour === 0 && parts.minute === 0 && parts.second === 0) {
-    daysToAdd = 0;
-  } else {
-    daysToAdd = (7 - day) % 7;
-    if (daysToAdd === 0) daysToAdd = 7; // today is Sunday but past 00:00 → next Sunday
-  }
+  // "Sunday of the current week":
+  //   - If today is Sunday → 0 days
+  //   - If today is Mon–Sat → 1..6 days to upcoming Sunday
+  const daysToAdd = day === 0 ? 0 : 7 - day;
   // Start from Manila midnight-today, add days, then convert to UTC instant.
   const targetUtcWallClock = new Date(manilaMidnightUtc);
   targetUtcWallClock.setUTCDate(targetUtcWallClock.getUTCDate() + daysToAdd);

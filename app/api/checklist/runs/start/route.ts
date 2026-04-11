@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageChecklistRuns, type PermissionSession } from "@/lib/permissions";
-import { getMultimediaMinistryId, computeUpcomingSundayManila } from "@/lib/checklist";
+import { getMultimediaMinistryId, computeCurrentWeekSundayManila } from "@/lib/checklist";
 import { publishRunChanged } from "@/services/checklistEvents";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +41,7 @@ export async function POST() {
     return NextResponse.json({ message: "An open run already exists" }, { status: 409 });
   }
 
-  const weekStart = computeUpcomingSundayManila();
+  const weekStart = computeCurrentWeekSundayManila();
 
   const existingAny = await prisma.checklistRun.findUnique({
     where: { templateId_weekStart: { templateId: template.id, weekStart } },

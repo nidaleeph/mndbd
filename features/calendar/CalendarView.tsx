@@ -47,7 +47,9 @@ export function CalendarView({ events }: { events: CalendarEvent[] }) {
     );
   }
 
+  // custom format — not in lib/dates.ts
   const monthLabel = new Date(current.year, current.month).toLocaleString("default", {
+    timeZone: "Asia/Manila",
     month: "long",
     year: "numeric",
   });

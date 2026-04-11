@@ -12,6 +12,7 @@ import { PageContainer, Card, Section, Badge, Button, type BadgeVariant } from "
 import { FiDownload } from "react-icons/fi";
 import { ApprovalHistoryTimeline } from "@/components/ApprovalHistoryTimeline";
 import { FormDetailActions } from "@/features/shared/FormDetailActions";
+import { formatManilaDate } from "@/lib/dates";
 
 export default async function ARFDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -98,7 +99,7 @@ export default async function ARFDetailPage({ params }: { params: Promise<{ id: 
             </div>
             <div>
               <dt className="text-sm text-[var(--color-text-muted)]">Requested date</dt>
-              <dd>{new Date(arf.requestedDate).toLocaleDateString()}</dd>
+              <dd>{formatManilaDate(arf.requestedDate)}</dd>
             </div>
             <div>
               <dt className="text-sm text-[var(--color-text-muted)]">What</dt>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import Pusher from "pusher-js";
 import { CelebrationOverlay } from "./CelebrationOverlay";
+import { formatManilaLongDate, formatManilaTime } from "@/lib/dates";
 
 interface Item {
   id: string;
@@ -51,21 +52,6 @@ interface Props {
 function categoryTag(name: string): string {
   const first = name.split(/[—\-–:]/)[0]?.trim() ?? name;
   return first.toUpperCase().slice(0, 6);
-}
-
-function formatHHMM(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-}
-
-function formatDateLabel(value: string | Date): string {
-  const d = typeof value === "string" ? new Date(value) : value;
-  return d.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 export function ChecklistPublicClient({
@@ -257,7 +243,7 @@ export function ChecklistPublicClient({
 
         <div className="cl-hero">
           <h1>Sunday Setup Checklist</h1>
-          <div className="cl-date">{formatDateLabel(liveRun.weekStart)}</div>
+          <div className="cl-date">{formatManilaLongDate(liveRun.weekStart)}</div>
           <div className="cl-progress-row">
             <div className="cl-count">
               {complete} of {total} complete
@@ -306,7 +292,7 @@ export function ChecklistPublicClient({
                       <div className="cl-item-label">{item.label}</div>
                       <div className="cl-item-meta">
                         {check
-                          ? `${check.checkedById === currentUserId ? "you" : check.checkedByName} · ${formatHHMM(check.checkedAt)}`
+                          ? `${check.checkedById === currentUserId ? "you" : check.checkedByName} · ${formatManilaTime(check.checkedAt)}`
                           : "—"}
                       </div>
                     </div>

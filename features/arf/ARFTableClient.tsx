@@ -6,6 +6,7 @@ import { ExpandableTable } from "@/features/shared/ExpandableTable";
 import { FormActionsCell, type RowActions } from "@/features/shared/FormActionsCell";
 import { Badge } from "@/components/ui";
 import { useTableSearchFilterSort, DataTableToolbar } from "@/features/shared/table";
+import { formatManilaDate } from "@/lib/dates";
 
 type ARFWithRelations = {
   id: string;
@@ -110,7 +111,7 @@ export function ARFTableClient({ arfs }: ARFTableClientProps) {
     {
       id: "date",
       header: "Date",
-      cell: (row: ARFWithRelations) => new Date(row.requestedDate).toLocaleDateString(),
+      cell: (row: ARFWithRelations) => formatManilaDate(row.requestedDate),
     },
     {
       id: "status",
@@ -164,7 +165,7 @@ export function ARFTableClient({ arfs }: ARFTableClientProps) {
         </div>
         <div>
           <dt className="text-sm font-medium text-[var(--color-text-muted)]">Requested date</dt>
-          <dd className="mt-0.5">{new Date(row.requestedDate).toLocaleDateString()}</dd>
+          <dd className="mt-0.5">{formatManilaDate(row.requestedDate)}</dd>
         </div>
         <div>
           <dt className="text-sm font-medium text-[var(--color-text-muted)]">What</dt>

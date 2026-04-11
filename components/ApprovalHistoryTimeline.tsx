@@ -1,4 +1,5 @@
 import { FiCheck, FiX } from "react-icons/fi";
+import { formatManilaDateTime } from "@/lib/dates";
 
 export interface ApprovalHistoryItem {
   action: string;
@@ -30,7 +31,7 @@ export function ApprovalHistoryTimeline({ items }: { items: ApprovalHistoryItem[
               {item.action === "approved" ? "Approved" : "Rejected"} by {item.performedByName}
             </p>
             <p className="text-sm text-[var(--color-text-muted)]">
-              {new Date(item.createdAt).toLocaleString()}
+              {formatManilaDateTime(item.createdAt)}
             </p>
             {item.comment && (
               <p className="mt-1 text-sm text-[var(--color-text-dark)]">{item.comment}</p>

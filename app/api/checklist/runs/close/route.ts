@@ -10,6 +10,7 @@ import {
 } from "@/lib/checklist";
 import { createNotificationsForUserIds } from "@/services/notificationService";
 import { publishRunChanged } from "@/services/checklistEvents";
+import { formatManilaDate } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -69,11 +70,7 @@ export async function POST() {
 
   const closedRecipients = await getRunClosedRecipients(multimediaMinistryId, session.userId);
   if (closedRecipients.length > 0) {
-    const dateLabel = closed.weekStart.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+    const dateLabel = formatManilaDate(closed.weekStart);
     await createNotificationsForUserIds(closedRecipients, {
       type: "checklist_run_closed",
       title: "Multimedia checklist closed",

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Pusher from "pusher-js";
+import { formatManilaTime, formatManilaWeekdayDateTime } from "@/lib/dates";
 
 interface RunSummary {
   id: string;
@@ -240,15 +241,7 @@ export function ChecklistLandingClient({
         />
         <StatCard
           label="Opened"
-          value={
-            run
-              ? new Date(run.startedAt).toLocaleString("en-US", {
-                  weekday: "short",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
-              : "—"
-          }
+          value={run ? formatManilaWeekdayDateTime(run.startedAt) : "—"}
           caption={
             run ? (run.startedByName ? `by ${run.startedByName}` : "by cron") : "no open run"
           }
@@ -315,11 +308,8 @@ export function ChecklistLandingClient({
           <div style={{ fontFamily: "monospace", fontSize: 12, lineHeight: 1.9 }}>
             {recentActivity.map((a, idx) => (
               <div key={`${a.checkedAt}-${idx}`}>
-                {new Date(a.checkedAt).toLocaleTimeString("en-US", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}{" "}
-                · <span style={{ color: "var(--color-text-dark)" }}>{a.label}</span> ·{" "}
+                {formatManilaTime(a.checkedAt)} ·{" "}
+                <span style={{ color: "var(--color-text-dark)" }}>{a.label}</span> ·{" "}
                 {a.checkedByName}
               </div>
             ))}

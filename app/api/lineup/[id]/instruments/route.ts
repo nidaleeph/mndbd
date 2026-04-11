@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { canApproveLineup, canSeeDraftLineup, type PermissionSession } from "@/lib/permissions";
 import { getMusicMinistryId } from "@/lib/checklist";
 import { createNotification } from "@/services/notificationService";
+import { formatManilaDate } from "@/lib/dates";
 
 async function checkLineupEditAccess(
   lineupId: string,
@@ -76,7 +77,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       select: { eventName: true, date: true, ministryId: true },
     });
     if (lineup) {
-      const dateStr = new Date(lineup.date).toLocaleDateString();
+      const dateStr = formatManilaDate(lineup.date);
       await createNotification({
         userId,
         type: "lineup_assignment",

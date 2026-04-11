@@ -2,13 +2,14 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
   getMultimediaMinistryId,
-  computeUpcomingSundayManila,
+  computeCurrentWeekSundayManila,
   startOfTodayManila,
   computeRunProgress,
   getRunClosedRecipients,
 } from "@/lib/checklist";
 import { createNotificationsForUserIds } from "@/services/notificationService";
 import { publishRunChanged } from "@/services/checklistEvents";
+import { formatManilaDate } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
   }
 
   const todayStart = startOfTodayManila();
-  const upcoming = computeUpcomingSundayManila();
+  const upcoming = computeCurrentWeekSundayManila();
   const closed: string[] = [];
   let started: string | null = null;
 
@@ -69,11 +70,7 @@ export async function GET(request: Request) {
       const closedProgress = computeRunProgress(closedItems, closedChecks);
       const closedRecipients = await getRunClosedRecipients(multimediaMinistryId, null);
       if (closedRecipients.length > 0) {
-        const dateLabel = run.weekStart.toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        });
+        const dateLabel = formatManilaDate(run.weekStart);
         await createNotificationsForUserIds(closedRecipients, {
           type: "checklist_run_closed",
           title: "Multimedia checklist closed",

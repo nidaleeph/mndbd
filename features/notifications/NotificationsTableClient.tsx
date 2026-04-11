@@ -10,6 +10,7 @@ import {
   ColumnFilterDropdown,
 } from "@/features/shared/table";
 import { MarkReadButton } from "@/app/(dashboard)/dashboard/notifications/MarkReadButton";
+import { formatManilaDateTime } from "@/lib/dates";
 
 type NotificationRow = {
   id: string;
@@ -173,9 +174,9 @@ export function NotificationsTableClient({ notifications }: NotificationsTableCl
                     <Badge variant={row.read ? "default" : "info"}>{formatRead(row.read)}</Badge>
                   </td>
                   <td className="px-4 py-3 text-[var(--color-text-dark)]">
-                    {new Date(
+                    {formatManilaDateTime(
                       row.createdAt instanceof Date ? row.createdAt : row.createdAt
-                    ).toLocaleString()}
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {!row.read && <MarkReadButton notificationId={row.id} />}

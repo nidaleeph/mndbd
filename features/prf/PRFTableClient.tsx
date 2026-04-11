@@ -6,6 +6,7 @@ import { ExpandableTable } from "@/features/shared/ExpandableTable";
 import { FormActionsCell, type RowActions } from "@/features/shared/FormActionsCell";
 import { Badge } from "@/components/ui";
 import { useTableSearchFilterSort, DataTableToolbar } from "@/features/shared/table";
+import { formatManilaDate } from "@/lib/dates";
 
 type PRFWithRelations = {
   id: string;
@@ -117,7 +118,7 @@ export function PRFTableClient({ prfs }: PRFTableClientProps) {
     {
       id: "date",
       header: "Date",
-      cell: (row: PRFWithRelations) => new Date(row.requestDate).toLocaleDateString(),
+      cell: (row: PRFWithRelations) => formatManilaDate(row.requestDate),
     },
     {
       id: "status",
@@ -171,7 +172,7 @@ export function PRFTableClient({ prfs }: PRFTableClientProps) {
         </div>
         <div>
           <dt className="text-sm font-medium text-[var(--color-text-muted)]">Request date</dt>
-          <dd className="mt-0.5">{new Date(row.requestDate).toLocaleDateString()}</dd>
+          <dd className="mt-0.5">{formatManilaDate(row.requestDate)}</dd>
         </div>
         <div>
           <dt className="text-sm font-medium text-[var(--color-text-muted)]">Amount requested</dt>

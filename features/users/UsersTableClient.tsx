@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { formatManilaRelative } from "@/lib/dates";
 
 interface Ministry {
   id: string;
@@ -358,12 +359,7 @@ function ApproveRow({
           </div>
         </td>
         <td className="p-2 text-xs text-[var(--color-text-muted)]">
-          {new Date(user.createdAt).toLocaleString("en-US", {
-            month: "short",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
+          {formatManilaRelative(user.createdAt)}
         </td>
         <td className="p-2 text-right">
           <button

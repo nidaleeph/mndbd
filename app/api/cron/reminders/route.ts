@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/services/notificationService";
 import { sendEmail } from "@/lib/sendgrid";
+import { formatManilaDateTime } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ export async function GET(request: Request) {
         const title = "Reminder";
         const body =
           r.lineupId && r.lineup
-            ? `Upcoming: ${r.lineup.eventName} at ${r.lineup.date.toLocaleString()}`
+            ? `Upcoming: ${r.lineup.eventName} at ${formatManilaDateTime(r.lineup.date)}`
             : "You have an upcoming event.";
         if (r.channel === "in_app" || r.channel === "email") {
           await createNotification({

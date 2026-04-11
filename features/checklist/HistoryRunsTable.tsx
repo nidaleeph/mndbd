@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatManilaDate } from "@/lib/dates";
 
 interface Row {
   id: string;
@@ -93,13 +94,7 @@ export function HistoryRunsTable() {
             style={{ cursor: "pointer" }}
           >
             <td style={cellStyle}>
-              <span style={{ fontFamily: "monospace" }}>
-                {new Date(r.weekStart).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "2-digit",
-                  year: "numeric",
-                })}
-              </span>
+              <span style={{ fontFamily: "monospace" }}>{formatManilaDate(r.weekStart)}</span>
             </td>
             <td style={{ ...cellStyle, color: pctColor(r.percent), fontFamily: "monospace" }}>
               {r.percent}%

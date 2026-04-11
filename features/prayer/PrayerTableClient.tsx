@@ -19,6 +19,7 @@ import {
   SortableHeader,
   ColumnFilterDropdown,
 } from "@/features/shared/table";
+import { formatManilaDateTime } from "@/lib/dates";
 
 type PrayerWithCreator = {
   id: string;
@@ -279,13 +280,7 @@ export function PrayerTableClient({ prayers }: PrayerTableClientProps) {
                                 Created
                               </dt>
                               <dd className="mt-1 text-sm text-[var(--color-text-dark)]">
-                                {new Date(row.createdAt).toLocaleDateString(undefined, {
-                                  year: "numeric",
-                                  month: "short",
-                                  day: "numeric",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })}
+                                {formatManilaDateTime(row.createdAt)}
                               </dd>
                             </div>
                           </dl>

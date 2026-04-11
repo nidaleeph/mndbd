@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Card, Button, Avatar } from "@/components/ui";
+import { formatManilaTime } from "@/lib/dates";
 
 interface ChatMessage {
   id: string;
@@ -139,7 +140,7 @@ export function LineupDetailClient({
                     isOwn ? "text-white/80" : "text-[var(--color-text-muted)]"
                   }`}
                 >
-                  {new Date(m.createdAt).toLocaleTimeString()}
+                  {formatManilaTime(m.createdAt)}
                 </p>
               </div>
             </li>

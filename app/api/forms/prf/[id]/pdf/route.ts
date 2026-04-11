@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canAccessForms, isMinistryMember, type PermissionSession } from "@/lib/permissions";
 import { jsPDF } from "jspdf";
+import { formatManilaDate } from "@/lib/dates";
 
 /**
  * GET /api/forms/prf/[id]/pdf
@@ -52,7 +53,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
   const rows: [string, string][] = [
     ["Ministry", prf.ministry.name],
-    ["Request Date", new Date(prf.requestDate).toLocaleDateString()],
+    ["Request Date", formatManilaDate(prf.requestDate)],
     ["Amount Requested", amount],
     ["Purpose", prf.purpose],
     ["Justification", prf.justification],

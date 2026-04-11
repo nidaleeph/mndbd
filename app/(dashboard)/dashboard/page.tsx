@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { PageContainer, Card, Section } from "@/components/ui";
 import { FiFileText, FiMusic, FiPlus, FiUsers, FiSettings } from "react-icons/fi";
 import Link from "next/link";
+import { formatManilaDate } from "@/lib/dates";
 
 function QuickActionLink({
   href,
@@ -159,7 +160,7 @@ export default async function DashboardPage() {
                         {l.eventName}
                       </Link>
                       <span className="ml-2 text-sm text-[var(--color-text-muted)]">
-                        {new Date(l.date).toLocaleDateString()} · {l.ministry.name}
+                        {formatManilaDate(l.date)} · {l.ministry.name}
                       </span>
                     </li>
                   ))
@@ -240,7 +241,7 @@ export default async function DashboardPage() {
                     <li key={n.id}>
                       <span className="font-medium">{n.title}</span>
                       <span className="ml-2 text-sm text-[var(--color-text-muted)]">
-                        {new Date(n.createdAt).toLocaleDateString()}
+                        {formatManilaDate(n.createdAt)}
                       </span>
                       {n.body && (
                         <p className="mt-1 line-clamp-2 text-sm text-[var(--color-text-muted)]">
@@ -347,7 +348,7 @@ export default async function DashboardPage() {
                         {l.eventName}
                       </Link>
                       <span className="ml-2 text-sm text-[var(--color-text-muted)]">
-                        {new Date(l.date).toLocaleDateString()}
+                        {formatManilaDate(l.date)}
                       </span>
                     </li>
                   ))
@@ -386,7 +387,7 @@ export default async function DashboardPage() {
                         {l.eventName}
                       </Link>
                       <span className="ml-2 text-sm text-[var(--color-text-muted)]">
-                        {new Date(l.date).toLocaleDateString()} · {l.status}
+                        {formatManilaDate(l.date)} · {l.status}
                       </span>
                     </li>
                   ))
@@ -410,15 +411,13 @@ export default async function DashboardPage() {
                     {myAssignments.map((a) => (
                       <li key={`inst-${a.lineupId}-${a.instrumentId}`}>
                         <FiMusic className="mr-2 inline size-4" />
-                        {a.instrument.name} – {a.lineup.eventName}{" "}
-                        {new Date(a.lineup.date).toLocaleDateString()}
+                        {a.instrument.name} – {a.lineup.eventName} {formatManilaDate(a.lineup.date)}
                       </li>
                     ))}
                     {mySingerAssignments.map((a) => (
                       <li key={`singer-${a.lineupId}-${a.singerRoleId}`}>
                         <FiMusic className="mr-2 inline size-4" />
-                        {a.singerRole.name} – {a.lineup.eventName}{" "}
-                        {new Date(a.lineup.date).toLocaleDateString()}
+                        {a.singerRole.name} – {a.lineup.eventName} {formatManilaDate(a.lineup.date)}
                       </li>
                     ))}
                   </>
@@ -447,7 +446,7 @@ export default async function DashboardPage() {
                         {l.eventName}
                       </Link>
                       <span className="ml-2 text-sm text-[var(--color-text-muted)]">
-                        {new Date(l.date).toLocaleDateString()} · {l.ministry.name}
+                        {formatManilaDate(l.date)} · {l.ministry.name}
                       </span>
                     </li>
                   ))
@@ -465,7 +464,7 @@ export default async function DashboardPage() {
                     <li key={n.id}>
                       <span className="font-medium">{n.title}</span>
                       <span className="ml-2 text-sm text-[var(--color-text-muted)]">
-                        {new Date(n.createdAt).toLocaleDateString()}
+                        {formatManilaDate(n.createdAt)}
                       </span>
                       {n.body && (
                         <p className="mt-1 line-clamp-2 text-sm text-[var(--color-text-muted)]">

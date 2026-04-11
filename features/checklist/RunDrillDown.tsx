@@ -1,3 +1,5 @@
+import { formatManilaLongDate, formatManilaTime } from "@/lib/dates";
+
 interface DrillItem {
   id: string;
   label: string;
@@ -18,10 +20,6 @@ interface Props {
   startedBy: string | null;
   closedBy: string | null;
   categories: DrillCategory[];
-}
-
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 }
 
 export function RunDrillDown({
@@ -51,14 +49,7 @@ export function RunDrillDown({
         >
           {"// history · drill-down"}
         </div>
-        <h1 style={{ margin: "4px 0 0", fontSize: 22 }}>
-          {new Date(weekStart).toLocaleDateString("en-US", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
-        </h1>
+        <h1 style={{ margin: "4px 0 0", fontSize: 22 }}>{formatManilaLongDate(weekStart)}</h1>
         <div style={{ color: "var(--color-text-muted)", fontSize: 13, marginTop: 6 }}>
           {complete} of {total} items complete · {percent}%
         </div>
@@ -75,14 +66,14 @@ export function RunDrillDown({
           <span>
             OPENED BY{" "}
             <strong style={{ color: "var(--color-text-dark)" }}>{startedBy ?? "cron"}</strong> ·{" "}
-            {formatTime(startedAt)}
+            {formatManilaTime(startedAt)}
           </span>
           <span>
             CLOSED BY{" "}
             <strong style={{ color: "var(--color-text-dark)" }}>
               {closedAt ? (closedBy ?? "cron") : "still open"}
             </strong>
-            {closedAt ? ` · ${formatTime(closedAt)}` : ""}
+            {closedAt ? ` · ${formatManilaTime(closedAt)}` : ""}
           </span>
         </div>
       </div>
@@ -154,7 +145,7 @@ export function RunDrillDown({
                     }}
                   >
                     {done && item.checkedBy
-                      ? `${item.checkedBy} · ${formatTime(item.checkedAt!)}`
+                      ? `${item.checkedBy} · ${formatManilaTime(item.checkedAt!)}`
                       : "never checked"}
                   </div>
                 </div>

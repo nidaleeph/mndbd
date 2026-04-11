@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Avatar } from "./Avatar";
+import { formatManilaDateTime } from "@/lib/dates";
 
 export interface NotificationItemData {
   id: string;
@@ -32,7 +33,7 @@ export function NotificationItem({ notification, onMarkRead }: NotificationItemP
         <p className="font-medium text-[var(--color-text-dark)]">{notification.title}</p>
         <p className="line-clamp-2 text-sm text-[var(--color-text-muted)]">{notification.body}</p>
         <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-          {new Date(notification.createdAt).toLocaleString()}
+          {formatManilaDateTime(notification.createdAt)}
         </p>
       </div>
     </div>

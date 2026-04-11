@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui";
+import { formatManilaDate } from "@/lib/dates";
 
 export default async function HomePage() {
   const session = await getServerSession(authOptions);
@@ -131,7 +132,9 @@ export default async function HomePage() {
                       {lineup.eventName}
                     </p>
                     <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                      {/* custom format — not in lib/dates.ts */}
                       {new Date(lineup.date).toLocaleDateString(undefined, {
+                        timeZone: "Asia/Manila",
                         weekday: "short",
                         month: "short",
                         day: "numeric",
@@ -175,7 +178,7 @@ export default async function HomePage() {
                     {n.body}
                   </p>
                   <p className="mt-2 text-xs text-[var(--color-text-muted)]">
-                    {new Date(n.createdAt).toLocaleDateString()}
+                    {formatManilaDate(n.createdAt)}
                   </p>
                 </Card>
               ))

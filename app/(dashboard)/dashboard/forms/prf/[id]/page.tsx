@@ -12,6 +12,7 @@ import { PageContainer, Card, Section, Badge, Button } from "@/components/ui";
 import { FiDownload } from "react-icons/fi";
 import { ApprovalHistoryTimeline } from "@/components/ApprovalHistoryTimeline";
 import { FormDetailActions } from "@/features/shared/FormDetailActions";
+import { formatManilaDate } from "@/lib/dates";
 
 export default async function PRFDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -101,7 +102,7 @@ export default async function PRFDetailPage({ params }: { params: Promise<{ id: 
             </div>
             <div>
               <dt className="text-sm text-[var(--color-text-muted)]">Request date</dt>
-              <dd>{new Date(prf.requestDate).toLocaleDateString()}</dd>
+              <dd>{formatManilaDate(prf.requestDate)}</dd>
             </div>
             <div>
               <dt className="text-sm text-[var(--color-text-muted)]">Amount requested</dt>

@@ -9,6 +9,7 @@ import { ApprovalHistoryTimeline } from "@/components/ApprovalHistoryTimeline";
 import { FormDetailActions } from "@/features/shared/FormDetailActions";
 import { LineupDetailClient } from "./LineupDetailClient";
 import { LineupAssignmentsClient } from "@/features/lineup/LineupAssignmentsClient";
+import { formatManilaDate } from "@/lib/dates";
 
 export default async function LineupDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -71,7 +72,7 @@ export default async function LineupDetailPage({ params }: { params: Promise<{ i
   return (
     <PageContainer
       title={lineup.eventName}
-      description={`${lineup.ministry.name} · ${new Date(lineup.date).toLocaleDateString()} · ${lineup.status}`}
+      description={`${lineup.ministry.name} · ${formatManilaDate(lineup.date)} · ${lineup.status}`}
     >
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <Badge
@@ -108,7 +109,7 @@ export default async function LineupDetailPage({ params }: { params: Promise<{ i
                 </div>
                 <div>
                   <dt className="text-sm text-[var(--color-text-muted)]">Date</dt>
-                  <dd>{new Date(lineup.date).toLocaleDateString()}</dd>
+                  <dd>{formatManilaDate(lineup.date)}</dd>
                 </div>
                 <div>
                   <dt className="text-sm text-[var(--color-text-muted)]">Created by</dt>

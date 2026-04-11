@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatManilaDate } from "@/lib/dates";
 
 interface Row {
   userId: string;
@@ -51,10 +52,7 @@ export function HistoryPeopleTable() {
             <td style={{ ...tdStyle, fontFamily: "monospace" }}>{r.totalChecked}</td>
             <td style={{ ...tdStyle, fontFamily: "monospace" }}>{r.avgPerRun}</td>
             <td style={{ ...tdStyle, fontFamily: "monospace" }}>
-              {new Date(r.lastActive).toLocaleDateString("en-US", {
-                month: "short",
-                day: "2-digit",
-              })}
+              {formatManilaDate(r.lastActive)}
             </td>
           </tr>
         ))}
