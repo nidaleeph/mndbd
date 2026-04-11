@@ -2,20 +2,27 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import type { RoleSlug } from "@/lib/permissions";
-import { canAccessPrayers, canManagePrayer, canViewAllPrayers } from "@/lib/permissions";
+import {
+  canAccessPrayers,
+  canManagePrayer,
+  canViewAllPrayers,
+  type PermissionSession,
+} from "@/lib/permissions";
+import { getParakletosMinistryId } from "@/lib/checklist";
 import { PageContainer, Card, Section, Badge } from "@/components/ui";
 import { PrayerDetailActions } from "@/features/prayer/PrayerDetailActions";
-
-const PARAKLETOS_SLUG = "parakletos";
 
 export default async function PrayerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await getServerSession(authOptions);
-  const roleSlug = (session as { roleSlug?: RoleSlug })?.roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] })?.ministryIds ?? [];
+  if (!session?.userId) notFound();
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
 
-  if (!canAccessPrayers(roleSlug)) notFound();
+  if (!canAccessPrayers()) notFound();
 
   const prayer = await prisma.prayer.findUnique({
     where: { id },
@@ -23,21 +30,13 @@ export default async function PrayerDetailPage({ params }: { params: Promise<{ i
   });
   if (!prayer) notFound();
 
-  const parakletos = await prisma.ministry.findUnique({
-    where: { slug: PARAKLETOS_SLUG },
-  });
-  if (!parakletos || prayer.ministryId !== parakletos.id) notFound();
+  const parakletosId = await getParakletosMinistryId();
+  if (!parakletosId || prayer.ministryId !== parakletosId) notFound();
 
-  const viewAll = canViewAllPrayers(roleSlug, ministryIds, parakletos.id);
-  if (!viewAll && prayer.createdById !== session?.userId) notFound();
+  const viewAll = canViewAllPrayers(ps, parakletosId);
+  if (!viewAll && prayer.createdById !== session.userId) notFound();
 
-  const perms = canManagePrayer(
-    roleSlug,
-    ministryIds,
-    parakletos.id,
-    prayer.createdById,
-    session?.userId ?? ""
-  );
+  const perms = canManagePrayer(ps, parakletosId, prayer.createdById, session.userId);
 
   return (
     <PageContainer title={prayer.title} description={`Prayer · ${prayer.status}`}>

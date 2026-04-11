@@ -1,52 +1,43 @@
 import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { RoleSlug } from "@/lib/permissions";
-import { canAccessUsers } from "@/lib/permissions";
+import { canAccessUsers, type PermissionSession } from "@/lib/permissions";
 import { PageContainer, Card, Button } from "@/components/ui";
 import Link from "next/link";
 import { FiPlus } from "react-icons/fi";
 import { UsersTableClient } from "@/features/users/UsersTableClient";
 
+export const dynamic = "force-dynamic";
+
 export default async function UsersPage() {
   const session = await getServerSession(authOptions);
-  const roleSlug = (session as { roleSlug?: RoleSlug })?.roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] })?.ministryIds ?? [];
+  if (!session?.userId) redirect("/login?callbackUrl=/dashboard/users");
 
-  if (!canAccessUsers(roleSlug)) {
-    return (
-      <PageContainer title="Users">
-        <p>You do not have access to this page.</p>
-      </PageContainer>
-    );
-  }
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
+  if (!canAccessUsers(ps)) redirect("/dashboard");
 
-  const where =
-    roleSlug === "admin"
-      ? {}
-      : ministryIds.length > 0
-        ? {
-            OR: [
-              { ministryId: { in: ministryIds } },
-              { userMinistries: { some: { ministryId: { in: ministryIds } } } },
-            ],
-          }
-        : { id: "none" };
-  const users = await prisma.user.findMany({
-    where,
+  const allMinistries = await prisma.ministry.findMany({
+    where: { active: true },
+    select: { id: true, name: true },
     orderBy: { name: "asc" },
-    include: { ministry: true, role: true, userMinistries: { include: { ministry: true } } },
   });
 
   return (
     <PageContainer title="Users" description="Manage users and roles">
-      <div className="mb-4 flex justify-end">
-        <Link href="/dashboard/users/new">
-          <Button icon={<FiPlus className="size-4" />}>Add user</Button>
-        </Link>
-      </div>
+      {session.isAdmin ? (
+        <div className="mb-4 flex justify-end">
+          <Link href="/dashboard/users/new">
+            <Button icon={<FiPlus className="size-4" />}>Add user</Button>
+          </Link>
+        </div>
+      ) : null}
       <Card>
-        <UsersTableClient users={users} emptyMessage="No users found." />
+        <UsersTableClient viewerIsAdmin={session.isAdmin} allMinistries={allMinistries} />
       </Card>
     </PageContainer>
   );

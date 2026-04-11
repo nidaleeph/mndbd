@@ -2,8 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { RoleSlug } from "@/lib/permissions";
-import { canManageMinistry } from "@/lib/permissions";
+import { canApproveARFOrPRF, isMinistryMember, type PermissionSession } from "@/lib/permissions";
 import { arfSchema } from "@/schemas/arf";
 import { getAdminUserIds, getMinistryMemberIds } from "@/lib/notificationRecipients";
 import { createNotificationsForUserIds } from "@/services/notificationService";
@@ -21,16 +20,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!arf) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] }).ministryIds ?? [];
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
   if (arf.status === "draft") {
-    if (roleSlug === "ministry_head") {
+    if (!session.isAdmin && arf.createdById !== session.userId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    if (roleSlug === "user" && arf.createdById !== session.userId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-  } else if (roleSlug === "user" && !ministryIds.includes(arf.ministryId)) {
+  } else if (!isMinistryMember(ps, arf.ministryId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   return NextResponse.json({
@@ -44,15 +43,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!session?.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] }).ministryIds ?? [];
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
   const { id } = await params;
   const existing = await prisma.aRF.findUnique({ where: { id } });
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const canEditDraft = roleSlug === "admin" || existing.createdById === session.userId;
-  const canEditNonDraft = canManageMinistry(roleSlug, ministryIds, existing.ministryId);
+  const canEditDraft = session.isAdmin || existing.createdById === session.userId;
+  const canEditNonDraft = canApproveARFOrPRF(ps, existing.ministryId);
   const canEdit = existing.status === "draft" ? canEditDraft : canEditNonDraft;
   if (!canEdit) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -68,14 +70,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       { status: 400 }
     );
   }
-  if (roleSlug === "ministry_head" && parsed.data.ministryId !== existing.ministryId) {
+  if (!session.isAdmin && parsed.data.ministryId !== existing.ministryId) {
     return NextResponse.json({ error: "Cannot change ministry" }, { status: 403 });
   }
   let statusToUse: "approved" | "rejected" | "draft" | "pending" = (parsed.data.status ??
     existing.status) as "approved" | "rejected" | "draft" | "pending";
   if (
     ["approved", "rejected"].includes(statusToUse) &&
-    !canManageMinistry(roleSlug, ministryIds, existing.ministryId)
+    !canApproveARFOrPRF(ps, existing.ministryId)
   ) {
     statusToUse = existing.status as "approved" | "rejected" | "draft" | "pending";
   }
@@ -125,8 +127,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!session?.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] }).ministryIds ?? [];
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
   const { id } = await params;
   const existing = await prisma.aRF.findUnique({ where: { id } });
   if (!existing) {
@@ -140,11 +145,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const canSubmitDraft =
     existing.status === "draft" &&
     newStatus === "pending" &&
-    (existing.createdById === session.userId || roleSlug === "admin");
+    (existing.createdById === session.userId || session.isAdmin);
   const canApproveReject =
     existing.status === "pending" &&
     ["approved", "rejected"].includes(newStatus) &&
-    canManageMinistry(roleSlug, ministryIds, existing.ministryId);
+    canApproveARFOrPRF(ps, existing.ministryId);
   if (!canSubmitDraft && !canApproveReject) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -193,18 +198,20 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if (!session?.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] }).ministryIds ?? [];
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
   const { id } = await params;
   const existing = await prisma.aRF.findUnique({ where: { id } });
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   const canDeleteDraft =
-    existing.status === "draft" &&
-    (existing.createdById === session.userId || roleSlug === "admin");
+    existing.status === "draft" && (existing.createdById === session.userId || session.isAdmin);
   const canDeleteNonDraft =
-    existing.status !== "draft" && canManageMinistry(roleSlug, ministryIds, existing.ministryId);
+    existing.status !== "draft" && canApproveARFOrPRF(ps, existing.ministryId);
   if (!canDeleteDraft && !canDeleteNonDraft) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

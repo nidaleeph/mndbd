@@ -1,35 +1,46 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { RoleSlug } from "@/lib/permissions";
-import { canCreateLineup, canManageMinistry } from "@/lib/permissions";
+import {
+  canApproveLineup,
+  canCreateLineup,
+  canSeeDraftLineup,
+  type PermissionSession,
+} from "@/lib/permissions";
+import { getMusicMinistryId } from "@/lib/checklist";
 import { PageContainer, Card, Button } from "@/components/ui";
 import { FiPlus } from "react-icons/fi";
 import Link from "next/link";
 import { LineupTableClient } from "@/features/lineup/LineupTableClient";
 
-const MUSIC_SLUG = "music";
-
 export default async function LineupListPage() {
   const session = await getServerSession(authOptions);
-  const userId = (session as { userId?: string })?.userId ?? "";
-  const roleSlug = (session as { roleSlug?: RoleSlug })?.roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] })?.ministryIds ?? [];
+  if (!session?.userId) {
+    return (
+      <PageContainer title="Music Lineup">
+        <p>You must be signed in.</p>
+      </PageContainer>
+    );
+  }
+  const userId = session.userId;
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
 
-  const musicMinistry = await prisma.ministry.findUnique({
-    where: { slug: MUSIC_SLUG },
-  });
-  if (!musicMinistry) {
+  const musicMinistryId = await getMusicMinistryId();
+  if (!musicMinistryId) {
     return (
       <PageContainer title="Music Lineup">
         <p>Music ministry not found. Please run the database seed.</p>
       </PageContainer>
     );
   }
-  const canCreate = canCreateLineup(roleSlug, ministryIds, musicMinistry.id);
+  const canCreate = canCreateLineup(ps, musicMinistryId);
 
   const all = await prisma.lineup.findMany({
-    where: { ministryId: musicMinistry.id },
+    where: { ministryId: musicMinistryId },
     orderBy: { date: "desc" },
     include: {
       ministry: true,
@@ -43,22 +54,20 @@ export default async function LineupListPage() {
       },
     },
   });
-  // Drafts: admin, creator, or ministry head of music can see. Non-drafts: everyone sees.
+  // Drafts: admin, creator, or Music head can see. Non-drafts: everyone sees.
   const filtered = all.filter((l) => {
     if (l.status !== "Draft") return true;
-    if (roleSlug === "admin") return true;
-    if (l.createdById === userId) return true;
-    if (canManageMinistry(roleSlug, ministryIds, l.ministryId)) return true;
+    if (canSeeDraftLineup(ps, l.createdById, userId)) return true;
+    if (canApproveLineup(ps, musicMinistryId)) return true;
     return false;
   });
 
   const lineups = filtered.map((l) => {
     const canEdit =
-      roleSlug === "admin" ||
       (l.status === "Draft" &&
-        (l.createdById === userId || canManageMinistry(roleSlug, ministryIds, l.ministryId))) ||
-      (l.status !== "Draft" && canManageMinistry(roleSlug, ministryIds, l.ministryId));
-    const canApprove = canManageMinistry(roleSlug, ministryIds, l.ministryId);
+        (canSeeDraftLineup(ps, l.createdById, userId) || canApproveLineup(ps, musicMinistryId))) ||
+      (l.status !== "Draft" && canApproveLineup(ps, musicMinistryId));
+    const canApprove = canApproveLineup(ps, musicMinistryId);
     const statusActions: Array<"submit" | "approve"> =
       l.status === "Draft" && canEdit
         ? ["submit"]

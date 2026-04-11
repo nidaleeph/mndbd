@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canEditChecklistTemplate, type RoleSlug } from "@/lib/permissions";
+import { canEditChecklistTemplate, type PermissionSession } from "@/lib/permissions";
 import { getMultimediaMinistryId, notifyTemplateChangeIfRunOpen } from "@/lib/checklist";
 import { checklistCategoryPatchSchema } from "@/schemas/checklist";
 import { publishTemplateChanged } from "@/services/checklistEvents";
@@ -16,15 +16,18 @@ async function guard() {
   if (!session?.userId) {
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
-  const roleSlug = (session.roleSlug ?? "user") as RoleSlug;
-  const ministryIds = session.ministryIds ?? [];
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
   const multimediaMinistryId = await getMultimediaMinistryId();
   if (!multimediaMinistryId) {
     return {
       error: NextResponse.json({ error: "Multimedia ministry not found" }, { status: 500 }),
     };
   }
-  if (!canEditChecklistTemplate(roleSlug, ministryIds, multimediaMinistryId)) {
+  if (!canEditChecklistTemplate(ps, multimediaMinistryId)) {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
   return { session, multimediaMinistryId };

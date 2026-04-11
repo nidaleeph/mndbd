@@ -2,8 +2,13 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { RoleSlug } from "@/lib/permissions";
-import { canManageMinistry, canSeeDraftLineup } from "@/lib/permissions";
+import {
+  canApproveLineup,
+  canSeeDraftLineup,
+  isMinistryMember,
+  type PermissionSession,
+} from "@/lib/permissions";
+import { getMusicMinistryId } from "@/lib/checklist";
 import { lineupSchema } from "@/schemas/lineup";
 import { getLineupParticipantIds } from "@/lib/notificationRecipients";
 import { createNotificationsForUserIds } from "@/services/notificationService";
@@ -30,21 +35,26 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!lineup) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] }).ministryIds ?? [];
-  const musicMinistry = await prisma.ministry.findUnique({ where: { slug: "music" } });
-  if (musicMinistry && lineup.ministryId !== musicMinistry.id && roleSlug !== "admin") {
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
+  const musicMinistryId = await getMusicMinistryId();
+  if (!musicMinistryId) {
+    return NextResponse.json({ error: "Music ministry not found" }, { status: 500 });
+  }
+  // Non-music lineups are only visible to admin.
+  if (lineup.ministryId !== musicMinistryId && !session.isAdmin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  const canAccessDraft =
-    canSeeDraftLineup(
-      roleSlug,
-      lineup.createdById,
-      lineup.ministryId,
-      session.userId,
-      ministryIds
-    ) || canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
-  if (lineup.status === "Draft" && !canAccessDraft) {
+  // Non-draft lineups: any music member (or admin) can see.
+  // Draft lineups: only the creator, or admin.
+  if (lineup.status === "Draft") {
+    if (!canSeeDraftLineup(ps, lineup.createdById, session.userId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  } else if (!isMinistryMember(ps, musicMinistryId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   return NextResponse.json({
@@ -63,17 +73,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] }).ministryIds ?? [];
-  const canEditDraft =
-    canSeeDraftLineup(
-      roleSlug,
-      existing.createdById,
-      existing.ministryId,
-      session.userId,
-      ministryIds
-    ) || canManageMinistry(roleSlug, ministryIds, existing.ministryId);
-  const canEditNonDraft = canManageMinistry(roleSlug, ministryIds, existing.ministryId);
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
+  const musicMinistryId = await getMusicMinistryId();
+  if (!musicMinistryId) {
+    return NextResponse.json({ error: "Music ministry not found" }, { status: 500 });
+  }
+  // Drafts: creator or admin. Non-drafts: Music ministry head (or admin).
+  const canEditDraft = canSeeDraftLineup(ps, existing.createdById, session.userId);
+  const canEditNonDraft = canApproveLineup(ps, musicMinistryId);
   const canEdit = existing.status === "Draft" ? canEditDraft : canEditNonDraft;
   if (!canEdit) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -91,10 +102,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
   let statusToUse: "Draft" | "Pending Approval" | "Approved" = (parsed.data.status ??
     existing.status) as "Draft" | "Pending Approval" | "Approved";
-  if (
-    statusToUse === "Approved" &&
-    !canManageMinistry(roleSlug, ministryIds, existing.ministryId)
-  ) {
+  if (statusToUse === "Approved" && !canApproveLineup(ps, musicMinistryId)) {
     statusToUse = existing.status as "Draft" | "Pending Approval" | "Approved";
   }
   await prisma.lineup.update({
@@ -149,8 +157,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!session?.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] }).ministryIds ?? [];
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
+  const musicMinistryId = await getMusicMinistryId();
+  if (!musicMinistryId) {
+    return NextResponse.json({ error: "Music ministry not found" }, { status: 500 });
+  }
   const { id } = await params;
   const existing = await prisma.lineup.findUnique({ where: { id } });
   if (!existing) {
@@ -161,23 +176,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!newStatus || !["Draft", "Pending Approval", "Approved"].includes(newStatus)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
-  // Draft -> Pending Approval: creator or ministry head
+  // Draft -> Pending Approval: creator (or admin)
   if (existing.status === "Draft" && newStatus === "Pending Approval") {
-    if (
-      !canSeeDraftLineup(
-        roleSlug,
-        existing.createdById,
-        existing.ministryId,
-        session.userId,
-        ministryIds
-      )
-    ) {
+    if (!canSeeDraftLineup(ps, existing.createdById, session.userId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
   }
-  // Pending Approval -> Approved: admin or ministry head of that ministry
+  // Pending Approval -> Approved: Music ministry head (or admin)
   if (existing.status === "Pending Approval" && newStatus === "Approved") {
-    if (!canManageMinistry(roleSlug, ministryIds, existing.ministryId)) {
+    if (!canApproveLineup(ps, musicMinistryId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     await prisma.approvalHistory.create({
@@ -212,28 +219,30 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   return NextResponse.json({ ok: true });
 }
 
-/** DELETE: Remove lineup. Respects canSeeDraftLineup (edit permission). */
+/** DELETE: Remove lineup. Creator can delete their draft; heads can delete any. */
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] }).ministryIds ?? [];
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
+  const musicMinistryId = await getMusicMinistryId();
+  if (!musicMinistryId) {
+    return NextResponse.json({ error: "Music ministry not found" }, { status: 500 });
+  }
   const { id } = await params;
   const existing = await prisma.lineup.findUnique({ where: { id } });
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   const canEditDraft =
-    canSeeDraftLineup(
-      roleSlug,
-      existing.createdById,
-      existing.ministryId,
-      session.userId,
-      ministryIds
-    ) || canManageMinistry(roleSlug, ministryIds, existing.ministryId);
-  const canEditNonDraft = canManageMinistry(roleSlug, ministryIds, existing.ministryId);
+    canSeeDraftLineup(ps, existing.createdById, session.userId) ||
+    canApproveLineup(ps, musicMinistryId);
+  const canEditNonDraft = canApproveLineup(ps, musicMinistryId);
   const canEdit = existing.status === "Draft" ? canEditDraft : canEditNonDraft;
   if (!canEdit) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

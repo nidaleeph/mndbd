@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canEditChecklistTemplate, type RoleSlug } from "@/lib/permissions";
+import { canEditChecklistTemplate, type PermissionSession } from "@/lib/permissions";
 import { getMultimediaMinistryId } from "@/lib/checklist";
 import { TemplateEditor } from "@/features/checklist/TemplateEditor";
 
@@ -17,9 +17,12 @@ export default async function TemplateEditorPage() {
     return <div className="p-page">Multimedia ministry not configured.</div>;
   }
 
-  const roleSlug = (session.roleSlug ?? "user") as RoleSlug;
-  const ministryIds = session.ministryIds ?? [];
-  if (!canEditChecklistTemplate(roleSlug, ministryIds, multimediaMinistryId)) {
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
+  if (!canEditChecklistTemplate(ps, multimediaMinistryId)) {
     redirect("/dashboard/multimedia-checklist");
   }
 

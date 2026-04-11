@@ -6,11 +6,10 @@ import { FiMenu, FiBell, FiSearch } from "react-icons/fi";
 import { Avatar, Button, Dropdown } from "@/components/ui";
 import type { NotificationItemData } from "@/components/ui/NotificationItem";
 import { NotificationItem } from "@/components/ui/NotificationItem";
-import type { RoleSlug } from "@/lib/permissions";
 
 export interface NavbarProps {
   user: { name?: string | null; email?: string | null };
-  roleSlug: RoleSlug;
+  isAdmin?: boolean;
   notifications: NotificationItemData[];
   unreadCount: number;
   onMarkNotificationRead: (id: string) => void;

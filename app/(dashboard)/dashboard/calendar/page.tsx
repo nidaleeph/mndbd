@@ -1,22 +1,28 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { RoleSlug } from "@/lib/permissions";
 import { PageContainer, Card } from "@/components/ui";
 import { CalendarView } from "@/features/calendar/CalendarView";
 
 export default async function CalendarPage() {
   const session = await getServerSession(authOptions);
-  const roleSlug = (session as { roleSlug?: RoleSlug })?.roleSlug ?? "user";
-  const ministryId = (session as { ministryId?: string | null })?.ministryId ?? null;
+  const isAdmin = session?.isAdmin ?? false;
+  const headOfMinistryIds = session?.headOfMinistryIds ?? [];
+
+  // Admin sees all events. Non-admin ministry heads see only events for ministries
+  // they head. Plain members see all events too (calendar is read-only for them).
+  const scopedWhere =
+    !isAdmin && headOfMinistryIds.length > 0
+      ? { ministryId: { in: headOfMinistryIds } }
+      : undefined;
 
   const lineups = await prisma.lineup.findMany({
-    where: roleSlug === "ministry_head" && ministryId ? { ministryId } : undefined,
+    where: scopedWhere,
     include: { ministry: true },
     orderBy: { date: "asc" },
   });
   const arfs = await prisma.aRF.findMany({
-    where: roleSlug === "ministry_head" && ministryId ? { ministryId } : undefined,
+    where: scopedWhere,
     include: { ministry: true },
   });
 

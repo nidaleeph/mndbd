@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import type { Prisma } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canAccessUsers } from "@/lib/permissions";
-import type { RoleSlug } from "@/lib/permissions";
+import { canAccessUsers, type PermissionSession } from "@/lib/permissions";
 
 /**
  * GET /api/options/users
@@ -15,24 +15,38 @@ export async function GET(request: NextRequest) {
   if (!session?.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  const ministryId = (session as { ministryId?: string | null }).ministryId ?? null;
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
 
-  if (!canAccessUsers(roleSlug)) {
+  if (!canAccessUsers(ps)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const searchParams = request.nextUrl.searchParams;
   const filterMinistryId = searchParams.get("ministryId");
 
-  const where =
-    roleSlug === "admin"
-      ? filterMinistryId
-        ? { ministryId: filterMinistryId, status: "active" as const }
-        : { status: "active" as const }
-      : ministryId
-        ? { ministryId, status: "active" as const }
-        : { id: "none" as const };
+  // Admin: optionally filter by a specific ministry, otherwise all active users.
+  // Ministry head (non-admin): scoped to ministries they head.
+  let where: Prisma.UserWhereInput;
+  if (ps.isAdmin) {
+    where = filterMinistryId
+      ? { status: "active", userMinistries: { some: { ministryId: filterMinistryId } } }
+      : { status: "active" };
+  } else if (ps.headOfMinistryIds.length > 0) {
+    const scopedMinistryIds =
+      filterMinistryId && ps.headOfMinistryIds.includes(filterMinistryId)
+        ? [filterMinistryId]
+        : ps.headOfMinistryIds;
+    where = {
+      status: "active",
+      userMinistries: { some: { ministryId: { in: scopedMinistryIds } } },
+    };
+  } else {
+    where = { id: "none" };
+  }
 
   const users = await prisma.user.findMany({
     where,

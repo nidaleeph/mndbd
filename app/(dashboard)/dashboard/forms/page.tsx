@@ -2,15 +2,19 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
-import { canAccessForms } from "@/lib/permissions";
-import type { RoleSlug } from "@/lib/permissions";
+import { canAccessForms, type PermissionSession } from "@/lib/permissions";
 import { PageContainer, Card } from "@/components/ui";
 import { FiFileText } from "react-icons/fi";
 
 export default async function FormsIndexPage() {
   const session = await getServerSession(authOptions);
-  const roleSlug = (session as { roleSlug?: RoleSlug })?.roleSlug ?? "user";
-  if (!canAccessForms(roleSlug)) redirect("/dashboard");
+  if (!session?.userId) redirect("/login");
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
+  if (!canAccessForms(ps)) redirect("/dashboard");
   return (
     <PageContainer title="Forms" description="Activity and Purchase Request Forms">
       <div className="grid gap-4 sm:grid-cols-2">

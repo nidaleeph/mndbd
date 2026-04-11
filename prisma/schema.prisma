@@ -31,29 +31,15 @@ enum ReminderChannel {
   email
 }
 
-model Role {
-  id          String           @id @default(cuid())
-  name        String
-  slug        String           @unique
-  permissions RolePermission[]
-  users       User[]
+enum MinistryRole {
+  head
+  member
 }
 
-model Permission {
-  id       String           @id @default(cuid())
-  name     String
-  resource String
-  action   String
-  roles    RolePermission[]
-}
-
-model RolePermission {
-  roleId       String
-  permissionId String
-  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-
-  @@id([roleId, permissionId])
+enum UserStatus {
+  pending
+  active
+  inactive
 }
 
 model Ministry {
@@ -64,7 +50,6 @@ model Ministry {
   active            Boolean            @default(true)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
-  users             User[]
   userMinistries    UserMinistry[]
   arfs              ARF[]
   prfs              PRF[]
@@ -76,31 +61,31 @@ model Ministry {
 model UserMinistry {
   userId     String
   ministryId String
-  createdAt  DateTime @default(now())
+  role       MinistryRole @default(member)
+  createdAt  DateTime     @default(now())
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   ministry   Ministry @relation(fields: [ministryId], references: [id], onDelete: Cascade)
 
   @@id([userId, ministryId])
+  @@index([ministryId, role])
 }
 
 model User {
-  id                    String                 @id @default(cuid())
-  email                 String                 @unique
+  id                    String     @id @default(cuid())
+  email                 String     @unique
   hashedPassword        String
   name                  String
   address               String?
   age                   Int?
   birthday              DateTime?
-  status                String                 @default("active")
-  ministryId            String?
-  roleId                String
+  status                UserStatus @default(pending)
+  isAdmin               Boolean    @default(false)
   resetToken            String?
   resetTokenExp         DateTime?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  ministry              Ministry?              @relation(fields: [ministryId], references: [id], onDelete: SetNull)
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
   userMinistries        UserMinistry[]
-  role                  Role                   @relation(fields: [roleId], references: [id], onDelete: Restrict)
   arfsCreated           ARF[]                  @relation("ARFCreatedBy")
   prfsCreated           PRF[]                  @relation("PRFCreatedBy")
   approvalHistory       ApprovalHistory[]

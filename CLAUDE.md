@@ -45,15 +45,29 @@ There is no test runner configured — do not invent `npm test`. Verify changes 
 
 ### Session shape (extended NextAuth JWT)
 
-After login, `session` includes: `userId`, `roleId`, `roleSlug` (`"admin" | "ministry_head" | "user"`), `ministryId` (primary), and `ministryIds` (aggregated from `UserMinistry` + `User.ministryId`). Always read `session.ministryIds` for ministry scoping — never just `ministryId`.
+After login, `session` includes: `userId`, `isAdmin: boolean` (global admin flag), `status: "pending" | "active" | "inactive"`, `ministryIds: string[]` (every ministry the user belongs to), and `headOfMinistryIds: string[]` (subset of `ministryIds` where the user has the `head` role). The old `roleId`/`roleSlug`/`ministryId` fields are gone.
+
+The JWT callback in [lib/auth.ts](lib/auth.ts) **rehydrates from the DB on every request that resolves a session** — promotions, demotions, and deactivations propagate immediately without requiring re-login. Cost: one Prisma query per server request.
+
+Pending users authenticate successfully but the dashboard layout redirects them to `/pending`. Inactive users are rejected at the `authorize` callback.
 
 ### Permission model
 
-All role/ministry gates live in [lib/permissions.ts](lib/permissions.ts) as pure helpers (e.g. `canAccessForms`, `canCreateLineup`, `canManagePrayer`, `canSeeDraftLineup`). API routes and server components must call these rather than re-checking roles inline. Notable rules:
+All role/ministry gates live in [lib/permissions.ts](lib/permissions.ts) as pure helpers that take a `PermissionSession` (`{ isAdmin, ministryIds, headOfMinistryIds }`) — the `Session` object is structurally compatible. API routes and server components build a `PermissionSession` from the session and pass it in. Two primitives do the heavy lifting: `isMinistryHead(s, ministryId)` and `isMinistryMember(s, ministryId)`. Every other helper is built on top.
 
-- **Lineup view** is public to all authenticated users; **lineup create** requires admin OR membership in the Music ministry.
+Notable rules:
+
+- **Roles are per-ministry.** A user can be `head` of Multimedia and `member` of Yaps simultaneously. The role lives on `UserMinistry`, not `User`.
+- **Admin is global.** `User.isAdmin: true` short-circuits every `isMinistryHead`/`isMinistryMember` check.
+- **Lineup view** is public to all authenticated users; **lineup create** requires admin OR membership in the Music ministry; **lineup approve** requires Music ministry head.
 - **Draft lineups** are visible only to creator + admin (ministry heads deliberately excluded).
+- **ARF/PRF creation is per-target-ministry.** A ministry head can only create requests for ministries they actually head, not for ministries where they're a plain member.
+- **System Settings** is admin-only (tightened from the old "any ministry_head" rule).
 - **Prayer** access is Parakletos-ministry-scoped and returns a `{canView, canEdit, canDelete, canSetStatus}` capability object — destructure it, don't boolean-AND your own logic.
+
+### Signup approval workflow
+
+Signups land with `status: "pending"`. They authenticate successfully but the dashboard layout bounces them to `/pending`. Admin approves or rejects from the **Pending tab** on `/dashboard/users` (admin-only tab). Approve flips `status` to `active` and assigns ministries (admin can adjust the requested set before confirming). Reject hard-deletes the user — re-registration with the same email is allowed.
 
 ### Feature layout
 

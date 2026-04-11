@@ -2,20 +2,47 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { RoleSlug } from "@/lib/permissions";
 import { getMultimediaMinistryId } from "@/lib/checklist";
+import {
+  canAccessForms,
+  canAccessReports,
+  canAccessSettings,
+  canAccessUsers,
+  isMinistryMember,
+  type PermissionSession,
+} from "@/lib/permissions";
 import { DashboardShell } from "@/components/layout/DashboardShell";
+import type { SidebarGates } from "@/components/layout/Sidebar";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
   if (!session?.userId) {
     redirect("/login?callbackUrl=/dashboard");
   }
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  const ministryIds = session.ministryIds ?? [];
+  if (session.status === "pending") {
+    redirect("/pending");
+  }
+  if (session.status === "inactive") {
+    redirect("/login?error=inactive");
+  }
+
+  const permissionSession: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
+
   const multimediaMinistryId = await getMultimediaMinistryId();
-  const isMultimediaMember =
-    multimediaMinistryId !== null && ministryIds.includes(multimediaMinistryId);
+
+  const gates: SidebarGates = {
+    canAccessUsers: canAccessUsers(permissionSession),
+    canAccessForms: canAccessForms(permissionSession),
+    canAccessSettings: canAccessSettings(permissionSession),
+    canAccessReports: canAccessReports(permissionSession),
+    isMultimediaMember: multimediaMinistryId
+      ? isMinistryMember(permissionSession, multimediaMinistryId)
+      : false,
+  };
 
   const unreadCount = await prisma.notification.count({
     where: { userId: session.userId, read: false },
@@ -45,12 +72,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
         email: session.user?.email ?? null,
       }}
       userId={session.userId}
-      roleSlug={roleSlug}
+      gates={gates}
+      isAdmin={session.isAdmin}
       notifications={notificationList}
       unreadCount={unreadCount}
       pusherKey={pusherKey}
       pusherCluster={pusherCluster}
-      isMultimediaMember={isMultimediaMember}
     >
       {children}
     </DashboardShell>

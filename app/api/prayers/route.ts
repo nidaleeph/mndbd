@@ -2,37 +2,36 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { RoleSlug } from "@/lib/permissions";
-import { canAccessPrayers, canViewAllPrayers } from "@/lib/permissions";
+import { canAccessPrayers, canViewAllPrayers, type PermissionSession } from "@/lib/permissions";
+import { getParakletosMinistryId } from "@/lib/checklist";
 import { prayerSchema } from "@/schemas/prayer";
 import { getParakletosMemberIds } from "@/lib/notificationRecipients";
 import { createNotificationsForUserIds } from "@/services/notificationService";
-
-const PARAKLETOS_SLUG = "parakletos";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session?.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!canAccessPrayers((session as { roleSlug?: RoleSlug }).roleSlug ?? "user")) {
+  if (!canAccessPrayers()) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const parakletos = await prisma.ministry.findUnique({
-    where: { slug: PARAKLETOS_SLUG },
-  });
-  if (!parakletos) {
+  const parakletosId = await getParakletosMinistryId();
+  if (!parakletosId) {
     return NextResponse.json([]);
   }
 
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] }).ministryIds ?? [];
-  const viewAll = canViewAllPrayers(roleSlug, ministryIds, parakletos.id);
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
+  const viewAll = canViewAllPrayers(ps, parakletosId);
 
   const where = viewAll
-    ? { ministryId: parakletos.id }
-    : { ministryId: parakletos.id, createdById: session.userId };
+    ? { ministryId: parakletosId }
+    : { ministryId: parakletosId, createdById: session.userId };
 
   const prayers = await prisma.prayer.findMany({
     where,
@@ -48,14 +47,12 @@ export async function POST(request: Request) {
   if (!session?.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!canAccessPrayers((session as { roleSlug?: RoleSlug }).roleSlug ?? "user")) {
+  if (!canAccessPrayers()) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const parakletos = await prisma.ministry.findUnique({
-    where: { slug: PARAKLETOS_SLUG },
-  });
-  if (!parakletos) {
+  const parakletosId = await getParakletosMinistryId();
+  if (!parakletosId) {
     return NextResponse.json({ error: "Parakletos ministry not found" }, { status: 500 });
   }
 
@@ -74,7 +71,7 @@ export async function POST(request: Request) {
       description: parsed.data.description ?? null,
       status: parsed.data.status ?? "pending",
       createdById: session.userId,
-      ministryId: parakletos.id,
+      ministryId: parakletosId,
       updatedAt: new Date(),
     },
     include: { createdBy: { select: { name: true } } },
@@ -89,7 +86,7 @@ export async function POST(request: Request) {
       title: "New prayer request",
       body: prayer.title,
       link: `/dashboard/prayers/${prayer.id}`,
-      ministryId: parakletos.id,
+      ministryId: parakletosId,
     }).catch(() => {});
   }
 

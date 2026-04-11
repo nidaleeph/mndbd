@@ -2,8 +2,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import type { RoleSlug } from "@/lib/permissions";
-import { canAccessForms, canManageMinistry } from "@/lib/permissions";
+import {
+  canAccessForms,
+  canApproveARFOrPRF,
+  isMinistryMember,
+  type PermissionSession,
+} from "@/lib/permissions";
 import { PageContainer, Card, Section, Badge, Button, type BadgeVariant } from "@/components/ui";
 import { FiDownload } from "react-icons/fi";
 import { ApprovalHistoryTimeline } from "@/components/ApprovalHistoryTimeline";
@@ -12,10 +16,14 @@ import { FormDetailActions } from "@/features/shared/FormDetailActions";
 export default async function ARFDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await getServerSession(authOptions);
-  const roleSlug = (session as { roleSlug?: RoleSlug })?.roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] })?.ministryIds ?? [];
+  if (!session?.userId) notFound();
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
 
-  if (!canAccessForms(roleSlug)) {
+  if (!canAccessForms(ps)) {
     notFound();
   }
 
@@ -24,13 +32,12 @@ export default async function ARFDetailPage({ params }: { params: Promise<{ id: 
     include: { ministry: true, createdBy: { select: { name: true } } },
   });
   if (!arf) notFound();
-  const sessionUserId = (session as { userId?: string })?.userId;
-  // Ministry heads must NOT see drafts
-  if (arf.status === "draft" && roleSlug === "ministry_head") notFound();
-  // Users: drafts only if creator; non-drafts only if in ministry
-  if (roleSlug === "user") {
-    if (arf.status === "draft" && arf.createdById !== sessionUserId) notFound();
-    if (arf.status !== "draft" && !ministryIds.includes(arf.ministryId)) notFound();
+  const sessionUserId = session.userId;
+  // Drafts: only creator or admin can see. Non-drafts: ministry member (or admin).
+  if (arf.status === "draft") {
+    if (!session.isAdmin && arf.createdById !== sessionUserId) notFound();
+  } else if (!isMinistryMember(ps, arf.ministryId)) {
+    notFound();
   }
 
   const history = await prisma.approvalHistory.findMany({
@@ -41,12 +48,11 @@ export default async function ARFDetailPage({ params }: { params: Promise<{ id: 
 
   // Drafts: only creator or admin can edit. Non-drafts: ministry head can edit.
   const canEdit =
-    (arf.status === "draft" && (arf.createdById === sessionUserId || roleSlug === "admin")) ||
-    (arf.status !== "draft" && canManageMinistry(roleSlug, ministryIds, arf.ministryId));
+    (arf.status === "draft" && (arf.createdById === sessionUserId || session.isAdmin)) ||
+    (arf.status !== "draft" && canApproveARFOrPRF(ps, arf.ministryId));
   const canSubmitDraft =
-    arf.status === "draft" && (arf.createdById === sessionUserId || roleSlug === "admin");
-  const canApproveReject =
-    arf.status === "pending" && canManageMinistry(roleSlug, ministryIds, arf.ministryId);
+    arf.status === "draft" && (arf.createdById === sessionUserId || session.isAdmin);
+  const canApproveReject = arf.status === "pending" && canApproveARFOrPRF(ps, arf.ministryId);
   const statusActions: Array<"submit" | "approve" | "reject"> = canSubmitDraft
     ? ["submit"]
     : canApproveReject

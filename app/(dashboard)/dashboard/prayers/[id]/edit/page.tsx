@@ -2,20 +2,27 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { RoleSlug } from "@/lib/permissions";
-import { canAccessPrayers, canManagePrayer, canViewAllPrayers } from "@/lib/permissions";
+import {
+  canAccessPrayers,
+  canManagePrayer,
+  canViewAllPrayers,
+  type PermissionSession,
+} from "@/lib/permissions";
+import { getParakletosMinistryId } from "@/lib/checklist";
 import { PageContainer, Card } from "@/components/ui";
 import { PrayerForm } from "@/features/prayer/PrayerForm";
-
-const PARAKLETOS_SLUG = "parakletos";
 
 export default async function EditPrayerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await getServerSession(authOptions);
-  const roleSlug = (session as { roleSlug?: RoleSlug })?.roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] })?.ministryIds ?? [];
+  if (!session?.userId) redirect("/login");
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
 
-  if (!canAccessPrayers(roleSlug)) redirect("/dashboard/prayers");
+  if (!canAccessPrayers()) redirect("/dashboard/prayers");
 
   const prayer = await prisma.prayer.findUnique({
     where: { id },
@@ -23,19 +30,11 @@ export default async function EditPrayerPage({ params }: { params: Promise<{ id:
   });
   if (!prayer) redirect("/dashboard/prayers");
 
-  const parakletos = await prisma.ministry.findUnique({
-    where: { slug: PARAKLETOS_SLUG },
-  });
-  if (!parakletos || prayer.ministryId !== parakletos.id) redirect("/dashboard/prayers");
+  const parakletosId = await getParakletosMinistryId();
+  if (!parakletosId || prayer.ministryId !== parakletosId) redirect("/dashboard/prayers");
 
-  const viewAll = canViewAllPrayers(roleSlug, ministryIds, parakletos.id);
-  const perms = canManagePrayer(
-    roleSlug,
-    ministryIds,
-    parakletos.id,
-    prayer.createdById,
-    session?.userId ?? ""
-  );
+  const viewAll = canViewAllPrayers(ps, parakletosId);
+  const perms = canManagePrayer(ps, parakletosId, prayer.createdById, session.userId);
 
   if (!perms.canEdit && !viewAll) redirect("/dashboard/prayers");
 

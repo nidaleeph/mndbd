@@ -2,26 +2,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { RoleSlug } from "@/lib/permissions";
-import { canManageMinistry, canSeeDraftLineup } from "@/lib/permissions";
+import { canApproveLineup, canSeeDraftLineup, type PermissionSession } from "@/lib/permissions";
+import { getMusicMinistryId } from "@/lib/checklist";
 import { createNotification } from "@/services/notificationService";
 
 async function checkLineupEditAccess(
   lineupId: string,
-  session: { userId: string; roleSlug?: RoleSlug; ministryIds?: string[] }
+  session: { userId: string; isAdmin: boolean; ministryIds: string[]; headOfMinistryIds: string[] }
 ) {
   const lineup = await prisma.lineup.findUnique({ where: { id: lineupId } });
   if (!lineup) return { error: "Not found" as const, status: 404 as const };
-  const roleSlug = (session.roleSlug ?? "user") as RoleSlug;
-  const ministryIds = session.ministryIds ?? [];
+  const musicMinistryId = await getMusicMinistryId();
+  if (!musicMinistryId) {
+    return { error: "Music ministry not found" as const, status: 500 as const };
+  }
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
   const canEdit =
-    canSeeDraftLineup(
-      roleSlug,
-      lineup.createdById,
-      lineup.ministryId,
-      session.userId,
-      ministryIds
-    ) || canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
+    lineup.status === "Draft"
+      ? canSeeDraftLineup(ps, lineup.createdById, session.userId) ||
+        canApproveLineup(ps, musicMinistryId)
+      : canApproveLineup(ps, musicMinistryId);
   if (!canEdit) {
     return { error: "Forbidden" as const, status: 403 as const };
   }
@@ -34,10 +38,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id: lineupId } = await params;
-  const check = await checkLineupEditAccess(
-    lineupId,
-    session as { userId: string; roleSlug?: RoleSlug; ministryIds?: string[] }
-  );
+  const check = await checkLineupEditAccess(lineupId, {
+    userId: session.userId,
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  });
   if ("error" in check) return NextResponse.json({ error: check.error }, { status: check.status });
 
   const body = await request.json().catch(() => ({}));
@@ -93,10 +99,12 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id: lineupId } = await params;
-  const check = await checkLineupEditAccess(
-    lineupId,
-    session as { userId: string; roleSlug?: RoleSlug; ministryIds?: string[] }
-  );
+  const check = await checkLineupEditAccess(lineupId, {
+    userId: session.userId,
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  });
   if ("error" in check) return NextResponse.json({ error: check.error }, { status: check.status });
 
   const singerRoleId = request.nextUrl.searchParams.get("singerRoleId");

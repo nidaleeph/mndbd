@@ -12,8 +12,8 @@ interface ProfileData {
   address: string | null;
   age: number | null;
   birthday: string | null;
-  role: { id: string; name: string; slug: string };
-  ministries: { id: string; name: string }[];
+  isAdmin: boolean;
+  ministries: { id: string; name: string; role: "head" | "member" }[];
 }
 
 export function ProfileForm() {
@@ -29,8 +29,8 @@ export function ProfileForm() {
     password: "",
   });
   const [rolesAndMinistries, setRolesAndMinistries] = useState<{
-    role: { name: string };
-    ministries: { id: string; name: string }[];
+    isAdmin: boolean;
+    ministries: { id: string; name: string; role: "head" | "member" }[];
   } | null>(null);
   const [errors, setErrors] = useState<Partial<Record<keyof ProfileUpdateFormData, string>>>({});
 
@@ -47,7 +47,7 @@ export function ProfileForm() {
           password: "",
         });
         setRolesAndMinistries({
-          role: data.role,
+          isAdmin: data.isAdmin,
           ministries: data.ministries,
         });
       })
@@ -199,8 +199,10 @@ export function ProfileForm() {
           <Card>
             <dl className="grid gap-3 sm:grid-cols-2">
               <div>
-                <dt className="text-sm text-[var(--color-text-muted)]">Role</dt>
-                <dd className="font-medium">{rolesAndMinistries.role.name}</dd>
+                <dt className="text-sm text-[var(--color-text-muted)]">Account</dt>
+                <dd className="font-medium">
+                  {rolesAndMinistries.isAdmin ? "Administrator" : "Member"}
+                </dd>
               </div>
               <div>
                 <dt className="text-sm text-[var(--color-text-muted)]">Ministries</dt>
@@ -210,7 +212,14 @@ export function ProfileForm() {
                   ) : (
                     <ul className="list-disc pl-5">
                       {rolesAndMinistries.ministries.map((m) => (
-                        <li key={m.id}>{m.name}</li>
+                        <li key={m.id}>
+                          {m.name}
+                          {m.role === "head" && (
+                            <span className="ml-2 text-xs text-[var(--color-text-muted)]">
+                              (head)
+                            </span>
+                          )}
+                        </li>
                       ))}
                     </ul>
                   )}

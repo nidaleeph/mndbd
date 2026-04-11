@@ -2,6 +2,10 @@
 
 > **Purpose**: Feed this document to AI before prompts so it understands the project architecture, code standards, features, access rights, and auth. Read this first for context.
 
+> **⚠️ STALE SECTIONS:** This document was written before the **per-ministry role rework** (April 2026). The sections on session shape, the `Role` table, `roleSlug`, `ministry_head` as a global role, and the permission helper signatures are **out of date**. The current authoritative reference for the role model, session shape, and permission helpers is **[CLAUDE.md](../CLAUDE.md)** in the repo root, plus the specs at [docs/superpowers/specs/2026-04-12-user-roles-and-signup-approval-design.md](superpowers/specs/2026-04-12-user-roles-and-signup-approval-design.md). The high-level feature descriptions (sections 5, 6, 8, 9, 10, 11, 12, 13) below are still accurate; only the auth/role/session sections (3, 4, 7) are stale.
+
+> **Quick reality check:** roles are now per-ministry (`UserMinistry.role: "head" | "member"`); admin is a global `User.isAdmin` boolean; signups land in `pending` status and require admin approval. There is no longer a `Role` table.
+
 ---
 
 ## 1. Project Overview

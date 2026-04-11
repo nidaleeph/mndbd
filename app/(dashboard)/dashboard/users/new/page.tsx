@@ -1,22 +1,39 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
-import type { RoleSlug } from "@/lib/permissions";
-import { canAccessUsers } from "@/lib/permissions";
-import { PageContainer, Card } from "@/components/ui";
-import { UserForm } from "@/features/users/UserForm";
+import { prisma } from "@/lib/prisma";
+import { canAccessUsers, type PermissionSession } from "@/lib/permissions";
+import { PageContainer } from "@/components/ui";
+import { UserCreateClient } from "@/features/users/UserCreateClient";
+
+export const dynamic = "force-dynamic";
 
 export default async function NewUserPage() {
   const session = await getServerSession(authOptions);
-  const roleSlug = (session as { roleSlug?: RoleSlug })?.roleSlug ?? "user";
-  if (!canAccessUsers(roleSlug)) {
-    redirect("/dashboard/users");
-  }
+  if (!session?.userId) redirect("/login?callbackUrl=/dashboard/users/new");
+
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
+  if (!canAccessUsers(ps)) redirect("/dashboard");
+  // Only admins may create users directly.
+  if (!session.isAdmin) redirect("/dashboard/users");
+
+  const allMinistries = await prisma.ministry.findMany({
+    where: { active: true },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+
   return (
     <PageContainer title="Add user" description="Create a new user">
-      <Card>
-        <UserForm />
-      </Card>
+      <UserCreateClient
+        allMinistries={allMinistries}
+        editorIsAdmin={session.isAdmin}
+        editorHeadOfMinistryIds={session.headOfMinistryIds}
+      />
     </PageContainer>
   );
 }

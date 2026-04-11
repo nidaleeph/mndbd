@@ -1,7 +1,6 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { RoleSlug } from "@/lib/permissions";
 import { PageContainer, Card, Section } from "@/components/ui";
 import { FiFileText, FiMusic, FiPlus, FiUsers, FiSettings } from "react-icons/fi";
 import Link from "next/link";
@@ -28,113 +27,106 @@ function QuickActionLink({
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
-  const roleSlug = (session as { roleSlug?: RoleSlug })?.roleSlug ?? "user";
-  const userId = (session as { userId?: string })?.userId ?? "";
-  const ministryId = (session as { ministryId?: string | null })?.ministryId ?? null;
+  const isAdmin = session?.isAdmin ?? false;
+  const userId = session?.userId ?? "";
+  const headOfMinistryIds = session?.headOfMinistryIds ?? [];
+  const isMinistryHead = !isAdmin && headOfMinistryIds.length > 0;
+  const isPlainMember = !isAdmin && headOfMinistryIds.length === 0;
 
   // Data based on role
-  const pendingLineupsCount =
-    roleSlug === "admin"
-      ? await prisma.lineup.count({ where: { status: "Pending Approval" } })
-      : roleSlug === "ministry_head" && ministryId
-        ? await prisma.lineup.count({
-            where: { ministryId, status: "Pending Approval" },
-          })
-        : 0;
-  const recentArfs =
-    roleSlug === "admin"
+  const pendingLineupsCount = isAdmin
+    ? await prisma.lineup.count({ where: { status: "Pending Approval" } })
+    : isMinistryHead
+      ? await prisma.lineup.count({
+          where: { ministryId: { in: headOfMinistryIds }, status: "Pending Approval" },
+        })
+      : 0;
+  const recentArfs = isAdmin
+    ? await prisma.aRF.findMany({
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        include: { ministry: true },
+      })
+    : isMinistryHead
       ? await prisma.aRF.findMany({
+          where: { ministryId: { in: headOfMinistryIds } },
           take: 5,
           orderBy: { createdAt: "desc" },
           include: { ministry: true },
         })
-      : roleSlug === "ministry_head" && ministryId
-        ? await prisma.aRF.findMany({
-            where: { ministryId },
-            take: 5,
-            orderBy: { createdAt: "desc" },
-            include: { ministry: true },
-          })
-        : [];
-  const upcomingLineups =
-    roleSlug === "admin"
+      : [];
+  const upcomingLineups = isAdmin
+    ? await prisma.lineup.findMany({
+        where: { date: { gte: new Date() } },
+        take: 5,
+        orderBy: { date: "asc" },
+        include: { ministry: true },
+      })
+    : isMinistryHead
       ? await prisma.lineup.findMany({
-          where: { date: { gte: new Date() } },
+          where: { ministryId: { in: headOfMinistryIds }, date: { gte: new Date() } },
           take: 5,
           orderBy: { date: "asc" },
           include: { ministry: true },
         })
-      : roleSlug === "ministry_head" && ministryId
-        ? await prisma.lineup.findMany({
-            where: { ministryId, date: { gte: new Date() } },
-            take: 5,
-            orderBy: { date: "asc" },
-            include: { ministry: true },
-          })
-        : await prisma.lineup.findMany({
-            where: {
-              status: "Approved",
-              date: { gte: new Date() },
-            },
-            take: 5,
-            orderBy: { date: "asc" },
-            include: { ministry: true },
-          });
-  const myAssignments =
-    roleSlug === "user"
-      ? await prisma.instrumentAssignment.findMany({
-          where: { userId },
-          include: { lineup: true, instrument: true },
-        })
-      : [];
-  const mySingerAssignments =
-    roleSlug === "user"
-      ? await prisma.singerAssignment.findMany({
-          where: { userId },
-          include: { lineup: true, singerRole: true },
-        })
-      : [];
+      : await prisma.lineup.findMany({
+          where: {
+            status: "Approved",
+            date: { gte: new Date() },
+          },
+          take: 5,
+          orderBy: { date: "asc" },
+          include: { ministry: true },
+        });
+  const myAssignments = isPlainMember
+    ? await prisma.instrumentAssignment.findMany({
+        where: { userId },
+        include: { lineup: true, instrument: true },
+      })
+    : [];
+  const mySingerAssignments = isPlainMember
+    ? await prisma.singerAssignment.findMany({
+        where: { userId },
+        include: { lineup: true, singerRole: true },
+      })
+    : [];
 
   // Admin-only: system stats and recent notifications
-  const systemStats =
-    roleSlug === "admin"
-      ? {
-          ministries: await prisma.ministry.count({ where: { active: true } }),
-          users: await prisma.user.count(),
-          pendingLineups: pendingLineupsCount,
-        }
-      : null;
-  const recentNotifications =
-    roleSlug === "admin"
-      ? await prisma.notification.findMany({
-          take: 5,
-          orderBy: { createdAt: "desc" },
-        })
-      : [];
-  // User role: announcements for dashboard widget
-  const userAnnouncements =
-    roleSlug === "user"
-      ? await prisma.notification.findMany({
-          take: 5,
-          orderBy: { createdAt: "desc" },
-        })
-      : [];
+  const systemStats = isAdmin
+    ? {
+        ministries: await prisma.ministry.count({ where: { active: true } }),
+        users: await prisma.user.count(),
+        pendingLineups: pendingLineupsCount,
+      }
+    : null;
+  const recentNotifications = isAdmin
+    ? await prisma.notification.findMany({
+        take: 5,
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
+  // Plain members: announcements widget
+  const userAnnouncements = isPlainMember
+    ? await prisma.notification.findMany({
+        take: 5,
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
 
-  // Ministry head: draft lineups for their ministry
-  const draftLineups =
-    roleSlug === "ministry_head" && ministryId
-      ? await prisma.lineup.findMany({
-          where: { ministryId, status: "Draft" },
-          take: 10,
-          orderBy: { updatedAt: "desc" },
-          include: { ministry: true },
-        })
-      : [];
+  // Ministry head: draft lineups for the ministries they head
+  const draftLineups = isMinistryHead
+    ? await prisma.lineup.findMany({
+        where: { ministryId: { in: headOfMinistryIds }, status: "Draft" },
+        take: 10,
+        orderBy: { updatedAt: "desc" },
+        include: { ministry: true },
+      })
+    : [];
 
   return (
     <PageContainer title="Dashboard" description="Overview of your ministry activity">
       {/* Admin: Quick Actions and widgets */}
-      {roleSlug === "admin" && (
+      {isAdmin && (
         <>
           <Section title="Quick Actions">
             <div className="flex flex-wrap gap-3">
@@ -284,7 +276,7 @@ export default async function DashboardPage() {
       )}
 
       {/* Ministry Head: Quick Actions and widgets */}
-      {roleSlug === "ministry_head" && (
+      {isMinistryHead && (
         <>
           <Section title="Quick Actions">
             <div className="flex flex-wrap gap-3">
@@ -405,8 +397,8 @@ export default async function DashboardPage() {
         </>
       )}
 
-      {/* User: My Schedule, Upcoming Events, Announcements */}
-      {roleSlug === "user" && (
+      {/* Plain member: My Schedule, Upcoming Events, Announcements */}
+      {isPlainMember && (
         <>
           <Section title="My Schedule">
             <Card>

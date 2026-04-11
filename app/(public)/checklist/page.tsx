@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canToggleChecklistItem, type RoleSlug } from "@/lib/permissions";
+import { canToggleChecklistItem, type PermissionSession } from "@/lib/permissions";
 import { getMultimediaMinistryId } from "@/lib/checklist";
 import { ChecklistPublicClient } from "@/features/checklist/ChecklistPublicClient";
 
@@ -53,8 +53,11 @@ export default async function ChecklistPage() {
   const session = await getServerSession(authOptions);
   const canCheck = session?.userId
     ? canToggleChecklistItem(
-        (session.roleSlug ?? "user") as RoleSlug,
-        session.ministryIds ?? [],
+        {
+          isAdmin: session.isAdmin,
+          ministryIds: session.ministryIds,
+          headOfMinistryIds: session.headOfMinistryIds,
+        } satisfies PermissionSession,
         multimediaMinistryId
       )
     : false;

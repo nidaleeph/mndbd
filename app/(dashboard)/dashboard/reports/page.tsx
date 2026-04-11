@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
-import type { RoleSlug } from "@/lib/permissions";
+import { canAccessReports, type PermissionSession } from "@/lib/permissions";
 import { PageContainer, Card, Section } from "@/components/ui";
 
 /**
@@ -10,8 +10,12 @@ import { PageContainer, Card, Section } from "@/components/ui";
  */
 export default async function ReportsPage() {
   const session = await getServerSession(authOptions);
-  const roleSlug = (session as { roleSlug?: RoleSlug })?.roleSlug ?? "user";
-  if (roleSlug !== "admin") {
+  const ps: PermissionSession = {
+    isAdmin: session?.isAdmin ?? false,
+    ministryIds: session?.ministryIds ?? [],
+    headOfMinistryIds: session?.headOfMinistryIds ?? [],
+  };
+  if (!canAccessReports(ps)) {
     redirect("/dashboard");
   }
 

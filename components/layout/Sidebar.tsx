@@ -14,15 +14,20 @@ import {
   FiHeart,
   FiMonitor,
 } from "react-icons/fi";
-import type { RoleSlug } from "@/lib/permissions";
+
+export interface SidebarGates {
+  canAccessUsers: boolean;
+  canAccessForms: boolean;
+  canAccessSettings: boolean;
+  canAccessReports: boolean;
+  isMultimediaMember: boolean;
+}
 
 interface NavItem {
   href: string;
   label: string;
   icon: React.ReactNode;
-  roles: RoleSlug[];
-  /** If true, also show when the user is a Multimedia ministry member (in addition to `roles`). */
-  allowIfMultimediaMember?: boolean;
+  show: (g: SidebarGates) => boolean;
 }
 
 const navItems: NavItem[] = [
@@ -30,79 +35,72 @@ const navItems: NavItem[] = [
     href: "/dashboard",
     label: "Dashboard",
     icon: <FiHome className="size-5" />,
-    roles: ["admin", "ministry_head", "user"],
+    show: () => true,
   },
   {
     href: "/dashboard/forms",
     label: "Forms",
     icon: <FiFileText className="size-5" />,
-    roles: ["admin", "ministry_head"],
+    show: (g) => g.canAccessForms,
   },
   {
     href: "/dashboard/lineup",
     label: "Music Lineup",
     icon: <FiMusic className="size-5" />,
-    roles: ["admin", "ministry_head", "user"],
+    show: () => true,
   },
   {
     href: "/dashboard/multimedia-checklist",
     label: "Multimedia Checklist",
     icon: <FiMonitor className="size-5" />,
-    roles: ["admin"],
-    allowIfMultimediaMember: true,
+    show: (g) => g.isMultimediaMember,
   },
   {
     href: "/dashboard/calendar",
     label: "Calendar",
     icon: <FiCalendar className="size-5" />,
-    roles: ["admin", "ministry_head", "user"],
+    show: () => true,
   },
   {
     href: "/dashboard/prayers",
     label: "Prayers",
     icon: <FiHeart className="size-5" />,
-    roles: ["admin", "ministry_head", "user"],
+    show: () => true,
   },
   {
     href: "/dashboard/notifications",
     label: "Notifications",
     icon: <FiBell className="size-5" />,
-    roles: ["admin", "ministry_head", "user"],
+    show: () => true,
   },
   {
     href: "/dashboard/users",
     label: "Users",
     icon: <FiUsers className="size-5" />,
-    roles: ["admin", "ministry_head"],
+    show: (g) => g.canAccessUsers,
   },
   {
     href: "/dashboard/reports",
     label: "Reports",
     icon: <FiBarChart2 className="size-5" />,
-    roles: ["admin"],
+    show: (g) => g.canAccessReports,
   },
   {
     href: "/dashboard/settings",
     label: "System Settings",
     icon: <FiSettings className="size-5" />,
-    roles: ["admin", "ministry_head"],
+    show: (g) => g.canAccessSettings,
   },
 ];
 
 export interface SidebarProps {
-  roleSlug: RoleSlug;
-  /** On mobile, when true sidebar is hidden (drawer closed). When false, sidebar is visible as overlay. */
+  gates: SidebarGates;
   collapsed?: boolean;
-  isMultimediaMember?: boolean;
 }
 
-export function Sidebar({ roleSlug, collapsed = false, isMultimediaMember = false }: SidebarProps) {
+export function Sidebar({ gates, collapsed = false }: SidebarProps) {
   const pathname = usePathname();
-  const visibleItems = navItems.filter((item) => {
-    if (item.roles.includes(roleSlug)) return true;
-    if (item.allowIfMultimediaMember && isMultimediaMember) return true;
-    return false;
-  });
+  const visibleItems = navItems.filter((item) => item.show(gates));
 
   return (
     <aside

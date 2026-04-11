@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect, notFound } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canViewChecklistHistory, type RoleSlug } from "@/lib/permissions";
+import { canViewChecklistHistory, type PermissionSession } from "@/lib/permissions";
 import { getMultimediaMinistryId } from "@/lib/checklist";
 import { RunDrillDown } from "@/features/checklist/RunDrillDown";
 
@@ -18,8 +18,12 @@ export default async function RunDrillPage({ params }: Params) {
   if (!multimediaMinistryId)
     return <div className="p-page">Multimedia ministry not configured.</div>;
 
-  const roleSlug = (session.roleSlug ?? "user") as RoleSlug;
-  if (!canViewChecklistHistory(roleSlug, session.ministryIds ?? [], multimediaMinistryId)) {
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
+  if (!canViewChecklistHistory(ps, multimediaMinistryId)) {
     redirect("/dashboard");
   }
 

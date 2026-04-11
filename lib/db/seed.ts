@@ -1,5 +1,6 @@
 /**
- * Database seed: roles, ministries, instruments, singer roles, permissions, and default admin user.
+ * Database seed: ministries, instruments, singer roles, default admin user,
+ * and Multimedia checklist starter template.
  * Run with: npm run db:seed (uses tsx lib/db/seed.ts)
  *
  * Admin user is created only if no user with that email exists.
@@ -24,21 +25,6 @@ function slugify(name: string): string {
 
 async function main() {
   const now = new Date();
-
-  // --- Roles ---
-  const roles = [
-    { name: "Admin", slug: "admin" },
-    { name: "Ministry Head", slug: "ministry_head" },
-    { name: "User", slug: "user" },
-  ];
-  for (const r of roles) {
-    await prisma.role.upsert({
-      where: { slug: r.slug },
-      create: r,
-      update: {},
-    });
-  }
-  console.log("Roles seeded.");
 
   // --- Ministries ---
   const ministries = [
@@ -108,57 +94,15 @@ async function main() {
   }
   console.log("Singer roles seeded.");
 
-  // --- Permissions (optional: basic CRUD for admin) ---
-  const permissions = [
-    { name: "Manage ministries", resource: "ministry", action: "manage" },
-    { name: "Manage users", resource: "user", action: "manage" },
-    { name: "Manage roles", resource: "role", action: "manage" },
-    { name: "Approve ARF", resource: "arf", action: "approve" },
-    { name: "Approve PRF", resource: "prf", action: "approve" },
-    { name: "Approve lineup", resource: "lineup", action: "approve" },
-    { name: "Manage settings", resource: "settings", action: "manage" },
-  ];
-  const adminRole = await prisma.role.findUnique({ where: { slug: "admin" } });
-  if (adminRole) {
-    for (const p of permissions) {
-      const existing = await prisma.permission.findFirst({
-        where: { resource: p.resource, action: p.action },
-      });
-      let perm = existing;
-      if (!existing) {
-        perm = await prisma.permission.create({
-          data: { name: p.name, resource: p.resource, action: p.action },
-        });
-      }
-      if (perm) {
-        await prisma.rolePermission.upsert({
-          where: {
-            roleId_permissionId: { roleId: adminRole.id, permissionId: perm.id },
-          },
-          create: { roleId: adminRole.id, permissionId: perm.id },
-          update: {},
-        });
-      }
-    }
-    console.log("Permissions seeded and linked to Admin role.");
-  }
-
   // --- Admin user ---
-  const adminRoleForUser = await prisma.role.findUnique({
-    where: { slug: "admin" },
-  });
-  if (!adminRoleForUser) {
-    throw new Error("Admin role not found after seed");
-  }
-
   const adminEmail = process.env.ADMIN_EMAIL ?? DEFAULT_ADMIN_EMAIL;
   const adminPassword = process.env.ADMIN_PASSWORD ?? DEFAULT_ADMIN_PASSWORD;
   const adminName = process.env.ADMIN_NAME ?? DEFAULT_ADMIN_NAME;
 
-  const existingUser = await prisma.user.findUnique({
+  const existingAdmin = await prisma.user.findUnique({
     where: { email: adminEmail },
   });
-  if (existingUser) {
+  if (existingAdmin) {
     console.log(`Admin user already exists: ${adminEmail}`);
   } else {
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
@@ -167,7 +111,8 @@ async function main() {
         email: adminEmail,
         name: adminName,
         hashedPassword,
-        roleId: adminRoleForUser.id,
+        isAdmin: true,
+        status: "active",
         updatedAt: now,
       },
     });
@@ -194,20 +139,28 @@ async function main() {
           "Verify EZ Lyrics — all correct",
           "Open vMix for NDI connections",
           "Check all monitors are on",
+          "Prepare all video",
         ],
       },
       {
         name: "PC2 — Camera & Stream",
         items: [
-          "Back cam connected",
           "OBS connection established",
-          "Front cam connection",
-          "Gimbal connection",
+          "Check if receiving sound from mixer",
+          "Back cam ready",
+          "Front cam ready",
+          "Gimbal ready",
+          "NDI connection established",
+          "Receiving audio from mixer",
+          "Facebook template ready",
+          "Youtube template ready",
+          "OBS monitor is out music area",
+          "Go Live",
         ],
       },
       {
         name: "Sound Mixer",
-        items: ["Pulpit mic working", "PC1 output to mixer", "PC2 receiving audio from mixer"],
+        items: ["Pulpit mic working", "PC1 output to mixer"],
       },
     ];
 

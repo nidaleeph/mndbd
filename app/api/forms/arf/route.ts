@@ -2,8 +2,11 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canCreateDraftARFOrPRF } from "@/lib/permissions";
-import type { RoleSlug } from "@/lib/permissions";
+import {
+  canCreateARFOrPRF,
+  canCreateDraftARFOrPRF,
+  type PermissionSession,
+} from "@/lib/permissions";
 import { arfSchema } from "@/schemas/arf";
 import { getAdminUserIds, getMinistryMemberIds } from "@/lib/notificationRecipients";
 import { createNotificationsForUserIds } from "@/services/notificationService";
@@ -12,11 +15,6 @@ export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] }).ministryIds ?? [];
-  if (!canCreateDraftARFOrPRF(roleSlug)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const body = await request.json();
   const parsed = arfSchema.safeParse({
@@ -29,31 +27,29 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
   const ministryId = parsed.data.ministryId;
   const wantsPending = body.status === "pending" || body.createAsDraft === false;
-  const status =
-    wantsPending && (roleSlug === "ministry_head" || roleSlug === "admin") ? "pending" : "draft";
-  if (roleSlug === "user") {
-    if (wantsPending) {
+  if (wantsPending) {
+    if (!canCreateARFOrPRF(ps, ministryId)) {
       return NextResponse.json(
         { error: "Only ministry heads can submit for approval" },
         { status: 403 }
       );
     }
-    if (!ministryIds.includes(ministryId)) {
-      return NextResponse.json(
-        { error: "You can only create ARFs for your ministries" },
-        { status: 403 }
-      );
-    }
-  } else if (roleSlug === "ministry_head") {
-    if (!ministryIds.includes(ministryId)) {
+  } else {
+    if (!canCreateDraftARFOrPRF(ps, ministryId)) {
       return NextResponse.json(
         { error: "You can only create ARFs for your ministries" },
         { status: 403 }
       );
     }
   }
+  const status = wantsPending ? "pending" : "draft";
   const arf = await prisma.aRF.create({
     data: {
       ministryId: parsed.data.ministryId,

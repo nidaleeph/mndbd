@@ -6,16 +6,17 @@ import { prisma } from "@/lib/prisma";
 /**
  * GET /api/options/ministries
  * Returns active ministries.
- * Query: context=user-create - for ministry_head, returns only their ministry.
+ * Query: context=user-create - for non-admins, scope to ministries they head.
  */
 export async function GET(request: NextRequest) {
   const context = request.nextUrl.searchParams.get("context");
   const session = await getServerSession(authOptions);
-  const ministryIds = (session as { ministryIds?: string[] })?.ministryIds ?? [];
+  const isAdmin = session?.isAdmin ?? false;
+  const headOfMinistryIds = session?.headOfMinistryIds ?? [];
 
   const where =
-    context === "user-create" && ministryIds.length > 0
-      ? { active: true, id: { in: ministryIds } }
+    context === "user-create" && !isAdmin && headOfMinistryIds.length > 0
+      ? { active: true, id: { in: headOfMinistryIds } }
       : { active: true };
 
   const ministries = await prisma.ministry.findMany({

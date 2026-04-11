@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canViewChecklistHistory, type RoleSlug } from "@/lib/permissions";
+import { canViewChecklistHistory, type PermissionSession } from "@/lib/permissions";
 import { getMultimediaMinistryId, computeRunProgress } from "@/lib/checklist";
 
 export const dynamic = "force-dynamic";
@@ -12,13 +12,16 @@ export async function GET(request: Request) {
   if (!session?.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const roleSlug = (session.roleSlug ?? "user") as RoleSlug;
-  const ministryIds = session.ministryIds ?? [];
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
   const multimediaMinistryId = await getMultimediaMinistryId();
   if (!multimediaMinistryId) {
     return NextResponse.json({ error: "Multimedia ministry not found" }, { status: 500 });
   }
-  if (!canViewChecklistHistory(roleSlug, ministryIds, multimediaMinistryId)) {
+  if (!canViewChecklistHistory(ps, multimediaMinistryId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

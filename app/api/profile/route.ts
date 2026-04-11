@@ -19,19 +19,22 @@ export async function GET() {
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
     include: {
-      role: { select: { id: true, name: true, slug: true } },
-      ministry: { select: { id: true, name: true } },
-      userMinistries: { include: { ministry: { select: { id: true, name: true } } } },
+      userMinistries: {
+        include: { ministry: { select: { id: true, name: true } } },
+      },
     },
   });
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const ministries = [
-    ...(user.ministry ? [user.ministry] : []),
-    ...user.userMinistries.map((um) => um.ministry),
-  ].filter((m, i, arr) => arr.findIndex((x) => x.id === m.id) === i);
+  const ministries = user.userMinistries
+    .map((um) => ({
+      id: um.ministry.id,
+      name: um.ministry.name,
+      role: um.role,
+    }))
+    .filter((m, i, arr) => arr.findIndex((x) => x.id === m.id) === i);
 
   return NextResponse.json({
     id: user.id,
@@ -40,7 +43,7 @@ export async function GET() {
     address: user.address ?? "",
     age: user.age ?? null,
     birthday: user.birthday ? user.birthday.toISOString().slice(0, 10) : null,
-    role: user.role,
+    isAdmin: user.isAdmin,
     ministries,
   });
 }

@@ -2,8 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { RoleSlug } from "@/lib/permissions";
-import { canAccessForms } from "@/lib/permissions";
+import { canAccessForms, isMinistryMember, type PermissionSession } from "@/lib/permissions";
 import { jsPDF } from "jspdf";
 
 /**
@@ -15,10 +14,13 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   if (!session?.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  const ministryId = (session as { ministryId?: string | null }).ministryId ?? null;
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
 
-  if (!canAccessForms(roleSlug)) {
+  if (!canAccessForms(ps)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -30,7 +32,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   if (!arf) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  if (roleSlug === "user" && arf.ministryId !== ministryId) {
+  if (!isMinistryMember(ps, arf.ministryId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

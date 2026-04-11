@@ -1,8 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { RoleSlug } from "@/lib/permissions";
-import { canAccessForms, canManageMinistry } from "@/lib/permissions";
+import { canAccessForms, canApproveARFOrPRF, type PermissionSession } from "@/lib/permissions";
 import { PageContainer, Card, Button } from "@/components/ui";
 import { FiPlus } from "react-icons/fi";
 import Link from "next/link";
@@ -10,10 +9,20 @@ import { ARFTableClient } from "@/features/arf/ARFTableClient";
 
 export default async function ARFListPage() {
   const session = await getServerSession(authOptions);
-  const roleSlug = (session as { roleSlug?: RoleSlug })?.roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] })?.ministryIds ?? [];
+  if (!session?.userId) {
+    return (
+      <PageContainer title="Forms">
+        <p>You do not have access to this page.</p>
+      </PageContainer>
+    );
+  }
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
 
-  if (!canAccessForms(roleSlug)) {
+  if (!canAccessForms(ps)) {
     return (
       <PageContainer title="Forms">
         <p>You do not have access to this page.</p>
@@ -21,22 +30,21 @@ export default async function ARFListPage() {
     );
   }
 
-  const userId = (session as { userId?: string })?.userId ?? "";
-  const where =
-    roleSlug === "admin"
-      ? {}
-      : roleSlug === "ministry_head"
-        ? ministryIds.length > 0
-          ? { ministryId: { in: ministryIds }, status: { not: "draft" } }
-          : { ministryId: "none" }
-        : ministryIds.length > 0
-          ? {
-              OR: [
-                { createdById: userId },
-                { status: { not: "draft" }, ministryId: { in: ministryIds } },
-              ],
-            }
-          : { createdById: userId };
+  const userId = session.userId;
+  const ministryIds = session.ministryIds;
+  // Admin sees everything. Everyone else sees:
+  //   - drafts they created
+  //   - non-draft ARFs for ministries they belong to
+  const where = session.isAdmin
+    ? {}
+    : ministryIds.length > 0
+      ? {
+          OR: [
+            { createdById: userId },
+            { status: { not: "draft" }, ministryId: { in: ministryIds } },
+          ],
+        }
+      : { createdById: userId };
   const rawArfs = await prisma.aRF.findMany({
     where,
     orderBy: { createdAt: "desc" },
@@ -47,7 +55,7 @@ export default async function ARFListPage() {
   const arfs = rawArfs.map((arf) => {
     const canEdit =
       (arf.status === "draft" && arf.createdById === userId) ||
-      (arf.status !== "draft" && canManageMinistry(roleSlug, ministryIds, arf.ministryId));
+      (arf.status !== "draft" && canApproveARFOrPRF(ps, arf.ministryId));
     const statusActions: Array<"submit" | "approve" | "reject"> =
       arf.status === "draft" && canEdit
         ? ["submit"]

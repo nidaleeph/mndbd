@@ -1,14 +1,20 @@
-import { getServerSession } from "next-auth";
+import { getServerSession, type Session } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canAccessSettings } from "@/lib/permissions";
-import type { RoleSlug } from "@/lib/permissions";
+import { canAccessSettings, type PermissionSession } from "@/lib/permissions";
+
+function toPs(session: Session | null): PermissionSession {
+  return {
+    isAdmin: session?.isAdmin ?? false,
+    ministryIds: session?.ministryIds ?? [],
+    headOfMinistryIds: session?.headOfMinistryIds ?? [],
+  };
+}
 
 export async function GET() {
   const session = await getServerSession(authOptions);
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  if (!canAccessSettings(roleSlug)) {
+  if (!canAccessSettings(toPs(session))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const list = await prisma.ministry.findMany({
@@ -20,8 +26,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  if (!canAccessSettings(roleSlug)) {
+  if (!canAccessSettings(toPs(session))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const body = await request.json().catch(() => ({}));

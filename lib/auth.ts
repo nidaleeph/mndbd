@@ -1,7 +1,8 @@
 /**
- * NextAuth configuration - Credentials provider with session extended with role/ministry.
+ * NextAuth configuration - Credentials provider with session extended for
+ * the per-ministry role model.
  *
- * Production: Set NEXTAUTH_SECRET to a strong random string (e.g. openssl rand -base64 32).
+ * Production: Set NEXTAUTH_SECRET to a strong random string.
  */
 
 import type { NextAuthOptions } from "next-auth";
@@ -17,30 +18,30 @@ import { prisma } from "./prisma";
 declare module "next-auth" {
   interface Session {
     userId: string;
-    roleId: string;
-    roleSlug: string;
-    ministryId: string | null;
+    isAdmin: boolean;
+    status: "pending" | "active" | "inactive";
     ministryIds: string[];
+    headOfMinistryIds: string[];
   }
 
   interface User {
     id: string;
     email: string;
     name: string;
-    roleId: string;
-    roleSlug: string;
-    ministryId: string | null;
+    isAdmin: boolean;
+    status: "pending" | "active" | "inactive";
     ministryIds: string[];
+    headOfMinistryIds: string[];
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
     userId: string;
-    roleId: string;
-    roleSlug: string;
-    ministryId: string | null;
+    isAdmin: boolean;
+    status: "pending" | "active" | "inactive";
     ministryIds: string[];
+    headOfMinistryIds: string[];
   }
 }
 
@@ -58,27 +59,32 @@ export const authOptions: NextAuthOptions = {
         }
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
-          include: { role: true, userMinistries: { select: { ministryId: true } } },
+          include: {
+            userMinistries: { select: { ministryId: true, role: true } },
+          },
         });
-        if (!user || user.status !== "active") {
-          return null;
-        }
+        if (!user) return null;
+
         const valid = await bcrypt.compare(credentials.password, user.hashedPassword);
-        if (!valid) {
-          return null;
-        }
+        if (!valid) return null;
+
+        // Inactive users are rejected here. Pending users ARE allowed through —
+        // the dashboard layout redirects them to /pending with a clear message.
+        if (user.status === "inactive") return null;
+
         const ministryIds = user.userMinistries.map((um) => um.ministryId);
-        if (user.ministryId && !ministryIds.includes(user.ministryId)) {
-          ministryIds.push(user.ministryId);
-        }
+        const headOfMinistryIds = user.userMinistries
+          .filter((um) => um.role === "head")
+          .map((um) => um.ministryId);
+
         return {
           id: user.id,
           email: user.email,
           name: user.name,
-          roleId: user.roleId,
-          roleSlug: user.role.slug,
-          ministryId: user.ministryId,
+          isAdmin: user.isAdmin,
+          status: user.status,
           ministryIds,
+          headOfMinistryIds,
         };
       },
     }),
@@ -86,11 +92,38 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        // Initial login
         token.userId = user.id;
-        token.roleId = user.roleId;
-        token.roleSlug = user.roleSlug;
-        token.ministryId = user.ministryId;
+        token.isAdmin = user.isAdmin;
+        token.status = user.status;
         token.ministryIds = user.ministryIds ?? [];
+        token.headOfMinistryIds = user.headOfMinistryIds ?? [];
+        return token;
+      }
+      // Subsequent requests — re-read fresh state so role/status changes
+      // propagate immediately without requiring re-login. Cost: one Prisma
+      // query per server request that resolves a session.
+      if (token.userId) {
+        const fresh = await prisma.user.findUnique({
+          where: { id: token.userId },
+          select: {
+            isAdmin: true,
+            status: true,
+            userMinistries: { select: { ministryId: true, role: true } },
+          },
+        });
+        if (!fresh) {
+          // User was deleted — invalidate token by returning an empty shape.
+          // The session callback's `if (token.userId)` guard treats this as
+          // "no session" downstream.
+          return {} as typeof token;
+        }
+        token.isAdmin = fresh.isAdmin;
+        token.status = fresh.status;
+        token.ministryIds = fresh.userMinistries.map((um) => um.ministryId);
+        token.headOfMinistryIds = fresh.userMinistries
+          .filter((um) => um.role === "head")
+          .map((um) => um.ministryId);
       }
       return token;
     },
@@ -98,12 +131,10 @@ export const authOptions: NextAuthOptions = {
       if (session.user && token.userId) {
         (session.user as { id?: string }).id = token.userId;
         session.userId = token.userId;
-        session.roleId = token.roleId;
-        session.roleSlug = token.roleSlug;
-        session.ministryId = token.ministryId;
-        // Support legacy sessions: use ministryId if ministryIds is empty
-        const ids = token.ministryIds ?? [];
-        session.ministryIds = ids.length > 0 ? ids : token.ministryId ? [token.ministryId] : [];
+        session.isAdmin = token.isAdmin ?? false;
+        session.status = token.status ?? "active";
+        session.ministryIds = token.ministryIds ?? [];
+        session.headOfMinistryIds = token.headOfMinistryIds ?? [];
       }
       return session;
     },

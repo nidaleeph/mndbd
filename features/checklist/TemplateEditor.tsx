@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -25,6 +25,13 @@ export function TemplateEditor({ initialCategories }: Props) {
   const [categories, setCategories] = useState(initialCategories);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync local state when the server re-renders with new data (router.refresh()).
+  // Without this, useState's initial value is captured once and the UI never
+  // reflects subsequent server re-fetches.
+  useEffect(() => {
+    setCategories(initialCategories);
+  }, [initialCategories]);
 
   const apiCall = useCallback(async (url: string, init: RequestInit): Promise<Response | null> => {
     setBusy(true);
@@ -52,7 +59,13 @@ export function TemplateEditor({ initialCategories }: Props) {
       method: "POST",
       body: JSON.stringify({ name: "New category", sortOrder: categories.length }),
     });
-    if (res) router.refresh();
+    if (!res) return;
+    const created = (await res.json()) as { id: string; name: string; sortOrder: number };
+    setCategories((prev) => [
+      ...prev,
+      { id: created.id, name: created.name, sortOrder: created.sortOrder, items: [] },
+    ]);
+    router.refresh();
   }, [apiCall, categories.length, router]);
 
   const renameCategory = useCallback(
@@ -70,8 +83,15 @@ export function TemplateEditor({ initialCategories }: Props) {
   const archiveCategory = useCallback(
     async (id: string) => {
       if (!window.confirm("Archive this category? Its items will also be archived.")) return;
+      // Optimistic remove
+      setCategories((prev) => prev.filter((c) => c.id !== id));
       const res = await apiCall(`/api/checklist/categories/${id}`, { method: "DELETE" });
-      if (res) router.refresh();
+      if (!res) {
+        // Rollback by re-fetching from server
+        router.refresh();
+        return;
+      }
+      router.refresh();
     },
     [apiCall, router]
   );
@@ -107,7 +127,23 @@ export function TemplateEditor({ initialCategories }: Props) {
           sortOrder: cat?.items.length ?? 0,
         }),
       });
-      if (res) router.refresh();
+      if (!res) return;
+      const created = (await res.json()) as { id: string; label: string; sortOrder: number };
+      // Optimistic insert into the right category
+      setCategories((prev) =>
+        prev.map((c) =>
+          c.id === categoryId
+            ? {
+                ...c,
+                items: [
+                  ...c.items,
+                  { id: created.id, label: created.label, sortOrder: created.sortOrder },
+                ],
+              }
+            : c
+        )
+      );
+      router.refresh();
     },
     [apiCall, categories, router]
   );
@@ -133,8 +169,19 @@ export function TemplateEditor({ initialCategories }: Props) {
   const archiveItem = useCallback(
     async (itemId: string) => {
       if (!window.confirm("Delete this item? History is preserved.")) return;
+      // Optimistic remove from whichever category contains it
+      setCategories((prev) =>
+        prev.map((c) => ({
+          ...c,
+          items: c.items.filter((i) => i.id !== itemId),
+        }))
+      );
       const res = await apiCall(`/api/checklist/items/${itemId}`, { method: "DELETE" });
-      if (res) router.refresh();
+      if (!res) {
+        router.refresh();
+        return;
+      }
+      router.refresh();
     },
     [apiCall, router]
   );

@@ -3,31 +3,31 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Sidebar, Navbar } from "@/components/layout";
+import type { SidebarGates } from "@/components/layout/Sidebar";
 import { useDebounce } from "@/hooks/useDebounce";
 import type { NotificationItemData } from "@/components/ui/NotificationItem";
-import type { RoleSlug } from "@/lib/permissions";
 
 interface DashboardShellProps {
   user: { name?: string | null; email?: string | null };
   userId: string;
-  roleSlug: RoleSlug;
+  gates: SidebarGates;
+  isAdmin?: boolean;
   notifications: NotificationItemData[];
   unreadCount: number;
   pusherKey: string;
   pusherCluster: string;
-  isMultimediaMember?: boolean;
   children: React.ReactNode;
 }
 
 export function DashboardShell({
   user,
   userId,
-  roleSlug,
+  gates,
+  isAdmin = false,
   notifications: initialNotifications,
   unreadCount: initialUnreadCount,
   pusherKey,
   pusherCluster,
-  isMultimediaMember = false,
   children,
 }: DashboardShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -100,15 +100,11 @@ export function DashboardShell({
           onKeyDown={(e) => e.key === "Enter" && setSidebarCollapsed(true)}
         />
       )}
-      <Sidebar
-        roleSlug={roleSlug}
-        collapsed={sidebarCollapsed}
-        isMultimediaMember={isMultimediaMember}
-      />
+      <Sidebar gates={gates} collapsed={sidebarCollapsed} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Navbar
           user={user}
-          roleSlug={roleSlug}
+          isAdmin={isAdmin}
           notifications={notifications}
           unreadCount={unreadCount}
           onMarkNotificationRead={handleMarkNotificationRead}

@@ -13,19 +13,36 @@ function LoginForm() {
   const { data: session, status } = useSession();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
 
-  // Redirect authenticated users to dashboard
+  // Redirect authenticated users based on status
   useEffect(() => {
     if (status === "authenticated" && session?.userId) {
-      const target =
-        callbackUrl.startsWith("/") && !callbackUrl.startsWith("//") && !callbackUrl.includes(":")
-          ? callbackUrl
-          : "/dashboard";
-      router.replace(target);
+      if (session.status === "pending") {
+        router.replace("/pending");
+      } else if (session.status === "inactive") {
+        // Should have been rejected at authorize; safety net
+        return;
+      } else {
+        const target =
+          callbackUrl.startsWith("/") && !callbackUrl.startsWith("//") && !callbackUrl.includes(":")
+            ? callbackUrl
+            : "/dashboard";
+        router.replace(target);
+      }
     }
-  }, [status, session?.userId, callbackUrl, router]);
+  }, [status, session?.userId, session?.status, callbackUrl, router]);
   const errorParam = searchParams.get("error");
   const [error, setError] = useState<string | null>(null);
   const errorFromUrl = errorParam === "CredentialsSignin" ? "Invalid email or password." : null;
+  const errorMessage = (() => {
+    if (!errorParam) return null;
+    if (errorParam === "inactive") {
+      return "Your account has been deactivated. Contact your admin.";
+    }
+    if (errorParam === "rejected") {
+      return "Your signup was rejected. You can sign up again or contact your admin.";
+    }
+    return null;
+  })();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<LoginFormData>({ email: "", password: "" });
   const [errors, setErrors] = useState<Partial<Record<keyof LoginFormData, string>>>({});
@@ -102,6 +119,11 @@ function LoginForm() {
           Church Ministry Management System
         </p>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+          {errorMessage ? (
+            <div className="mb-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+              {errorMessage}
+            </div>
+          ) : null}
           {(error ?? errorFromUrl) && (
             <p className="text-sm text-red-600" role="alert">
               {error ?? errorFromUrl}

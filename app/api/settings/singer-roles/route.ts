@@ -1,15 +1,23 @@
-import { getServerSession } from "next-auth";
+import { getServerSession, type Session } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canManageInstrumentsAndSingers } from "@/lib/permissions";
-import type { RoleSlug } from "@/lib/permissions";
+import { canManageInstrumentsAndSingers, type PermissionSession } from "@/lib/permissions";
+
+function toPs(session: Session | null): PermissionSession {
+  return {
+    isAdmin: session?.isAdmin ?? false,
+    ministryIds: session?.ministryIds ?? [],
+    headOfMinistryIds: session?.headOfMinistryIds ?? [],
+  };
+}
 
 export async function GET() {
+  // GET is open to any authenticated user — lineup assignment forms need this
+  // list. Mutating endpoints below are admin-only.
   const session = await getServerSession(authOptions);
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  if (!canManageInstrumentsAndSingers(roleSlug)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!session?.userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const list = await prisma.singerRole.findMany({
     orderBy: { name: "asc" },
@@ -19,8 +27,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  if (!canManageInstrumentsAndSingers(roleSlug)) {
+  if (!canManageInstrumentsAndSingers(toPs(session))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const body = await request.json().catch(() => ({}));

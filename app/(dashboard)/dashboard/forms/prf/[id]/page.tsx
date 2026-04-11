@@ -2,8 +2,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import type { RoleSlug } from "@/lib/permissions";
-import { canAccessForms, canManageMinistry } from "@/lib/permissions";
+import {
+  canAccessForms,
+  canApproveARFOrPRF,
+  isMinistryMember,
+  type PermissionSession,
+} from "@/lib/permissions";
 import { PageContainer, Card, Section, Badge, Button } from "@/components/ui";
 import { FiDownload } from "react-icons/fi";
 import { ApprovalHistoryTimeline } from "@/components/ApprovalHistoryTimeline";
@@ -12,23 +16,25 @@ import { FormDetailActions } from "@/features/shared/FormDetailActions";
 export default async function PRFDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await getServerSession(authOptions);
-  const roleSlug = (session as { roleSlug?: RoleSlug })?.roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] })?.ministryIds ?? [];
+  if (!session?.userId) notFound();
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
 
-  if (!canAccessForms(roleSlug)) notFound();
+  if (!canAccessForms(ps)) notFound();
 
   const prf = await prisma.pRF.findUnique({
     where: { id },
     include: { ministry: true, createdBy: { select: { name: true } } },
   });
   if (!prf) notFound();
-  const sessionUserId = (session as { userId?: string })?.userId;
-  // Ministry heads must NOT see drafts
-  if (prf.status === "draft" && roleSlug === "ministry_head") notFound();
-  // Users: drafts only if creator; non-drafts only if in ministry
-  if (roleSlug === "user") {
-    if (prf.status === "draft" && prf.createdById !== sessionUserId) notFound();
-    if (prf.status !== "draft" && !ministryIds.includes(prf.ministryId)) notFound();
+  const sessionUserId = session.userId;
+  if (prf.status === "draft") {
+    if (!session.isAdmin && prf.createdById !== sessionUserId) notFound();
+  } else if (!isMinistryMember(ps, prf.ministryId)) {
+    notFound();
   }
 
   const history = await prisma.approvalHistory.findMany({
@@ -39,12 +45,11 @@ export default async function PRFDetailPage({ params }: { params: Promise<{ id: 
 
   // Drafts: only creator or admin can edit. Non-drafts: ministry head can edit.
   const canEdit =
-    (prf.status === "draft" && (prf.createdById === sessionUserId || roleSlug === "admin")) ||
-    (prf.status !== "draft" && canManageMinistry(roleSlug, ministryIds, prf.ministryId));
+    (prf.status === "draft" && (prf.createdById === sessionUserId || session.isAdmin)) ||
+    (prf.status !== "draft" && canApproveARFOrPRF(ps, prf.ministryId));
   const canSubmitDraft =
-    prf.status === "draft" && (prf.createdById === sessionUserId || roleSlug === "admin");
-  const canApproveReject =
-    prf.status === "pending" && canManageMinistry(roleSlug, ministryIds, prf.ministryId);
+    prf.status === "draft" && (prf.createdById === sessionUserId || session.isAdmin);
+  const canApproveReject = prf.status === "pending" && canApproveARFOrPRF(ps, prf.ministryId);
   const statusActions: Array<"submit" | "approve" | "reject"> = canSubmitDraft
     ? ["submit"]
     : canApproveReject

@@ -2,26 +2,31 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { RoleSlug } from "@/lib/permissions";
-import { canManageMinistry, canSeeDraftLineup } from "@/lib/permissions";
+import { canApproveLineup, canSeeDraftLineup, type PermissionSession } from "@/lib/permissions";
+import { getMusicMinistryId } from "@/lib/checklist";
 import { PageContainer, Card } from "@/components/ui";
 import { LineupForm } from "@/features/lineup/LineupForm";
 
 export default async function EditLineupPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await getServerSession(authOptions);
-  const userId = (session as { userId?: string })?.userId ?? "";
-  const roleSlug = (session as { roleSlug?: RoleSlug })?.roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] })?.ministryIds ?? [];
+  if (!session?.userId) redirect("/login");
+  const userId = session.userId;
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
+  const musicMinistryId = await getMusicMinistryId();
+  if (!musicMinistryId) redirect("/dashboard/lineup");
   const lineup = await prisma.lineup.findUnique({ where: { id } });
   if (!lineup) redirect("/dashboard/lineup");
   const canEditDraft =
-    canSeeDraftLineup(roleSlug, lineup.createdById, lineup.ministryId, userId, ministryIds) ||
-    canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
-  const canEditNonDraft = canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
+    canSeeDraftLineup(ps, lineup.createdById, userId) || canApproveLineup(ps, musicMinistryId);
+  const canEditNonDraft = canApproveLineup(ps, musicMinistryId);
   const canEdit = lineup.status === "Draft" ? canEditDraft : canEditNonDraft;
   if (!canEdit) redirect("/dashboard/lineup");
-  const canApprove = canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
+  const canApprove = canApproveLineup(ps, musicMinistryId);
   return (
     <PageContainer title="Edit lineup" description={lineup.eventName}>
       <Card>

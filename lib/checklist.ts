@@ -6,7 +6,11 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import { getAdminUserIds, getMinistryMemberIds } from "@/lib/notificationRecipients";
+import {
+  getAdminUserIds,
+  getMinistryMemberIds,
+  getMinistryHeadIds,
+} from "@/lib/notificationRecipients";
 import { createNotificationsForUserIds } from "@/services/notificationService";
 
 export const MULTIMEDIA_MINISTRY_SLUG = "multimedia";
@@ -20,6 +24,24 @@ export async function getMultimediaMinistryId(): Promise<string | null> {
     select: { id: true },
   });
   return ministry?.id ?? null;
+}
+
+/** Look up the Music ministry id fresh on every call. */
+export async function getMusicMinistryId(): Promise<string | null> {
+  const m = await prisma.ministry.findUnique({
+    where: { slug: "music" },
+    select: { id: true },
+  });
+  return m?.id ?? null;
+}
+
+/** Look up the Parakletos ministry id fresh on every call. */
+export async function getParakletosMinistryId(): Promise<string | null> {
+  const m = await prisma.ministry.findUnique({
+    where: { slug: "parakletos" },
+    select: { id: true },
+  });
+  return m?.id ?? null;
 }
 
 /**
@@ -125,23 +147,16 @@ export async function getTemplateChangeRecipients(
   return memberIds.filter((id) => id !== actorUserId);
 }
 
-/** Admin ∪ Multimedia ministry_head users, minus the actor (if any — cron-closed runs have no actor). */
+/** Admin ∪ Multimedia ministry heads, minus the actor (if any — cron-closed runs have no actor). */
 export async function getRunClosedRecipients(
   multimediaMinistryId: string,
   actorUserId: string | null
 ): Promise<string[]> {
-  const adminIds = await getAdminUserIds();
-  const heads = await prisma.user.findMany({
-    where: {
-      role: { slug: "ministry_head" },
-      OR: [
-        { ministryId: multimediaMinistryId },
-        { userMinistries: { some: { ministryId: multimediaMinistryId } } },
-      ],
-    },
-    select: { id: true },
-  });
-  const all = new Set<string>([...adminIds, ...heads.map((h) => h.id)]);
+  const [adminIds, headIds] = await Promise.all([
+    getAdminUserIds(),
+    getMinistryHeadIds(multimediaMinistryId),
+  ]);
+  const all = new Set<string>([...adminIds, ...headIds]);
   if (actorUserId) all.delete(actorUserId);
   return Array.from(all);
 }

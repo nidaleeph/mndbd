@@ -5,40 +5,44 @@
 
 import { prisma } from "@/lib/prisma";
 
-const ADMIN_ROLE_SLUG = "admin";
 const PARAKLETOS_SLUG = "parakletos";
 
 /**
  * Returns user IDs of all admin users (for ARF/PRF notifications).
  */
 export async function getAdminUserIds(): Promise<string[]> {
-  const adminRole = await prisma.role.findUnique({
-    where: { slug: ADMIN_ROLE_SLUG },
-    select: { users: { where: { status: "active" }, select: { id: true } } },
+  const admins = await prisma.user.findMany({
+    where: { isAdmin: true, status: "active" },
+    select: { id: true },
   });
-  if (!adminRole) return [];
-  return adminRole.users.map((u) => u.id);
+  return admins.map((u) => u.id);
 }
 
 /**
- * Returns user IDs of all members in the given ministry.
- * Includes users in UserMinistry and users with ministryId set.
+ * Returns user IDs of all active members in the given ministry.
  */
 export async function getMinistryMemberIds(ministryId: string): Promise<string[]> {
-  const [fromUserMinistry, fromPrimaryMinistry] = await Promise.all([
-    prisma.userMinistry.findMany({
-      where: { ministryId },
-      select: { userId: true },
-    }),
-    prisma.user.findMany({
-      where: { ministryId, status: "active" },
-      select: { id: true },
-    }),
-  ]);
-  const ids = new Set<string>();
-  fromUserMinistry.forEach((um) => ids.add(um.userId));
-  fromPrimaryMinistry.forEach((u) => ids.add(u.id));
-  return Array.from(ids);
+  const rows = await prisma.userMinistry.findMany({
+    where: {
+      ministryId,
+      user: { status: "active" },
+    },
+    select: { userId: true },
+  });
+  return rows.map((r) => r.userId);
+}
+
+/** Returns active users who are heads of the given ministry. */
+export async function getMinistryHeadIds(ministryId: string): Promise<string[]> {
+  const rows = await prisma.userMinistry.findMany({
+    where: {
+      ministryId,
+      role: "head",
+      user: { status: "active" },
+    },
+    select: { userId: true },
+  });
+  return rows.map((r) => r.userId);
 }
 
 /**

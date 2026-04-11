@@ -1,85 +1,97 @@
 import { getServerSession } from "next-auth";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { RoleSlug } from "@/lib/permissions";
-import { canAccessUsers } from "@/lib/permissions";
+import { canAccessUsers, type PermissionSession } from "@/lib/permissions";
 import { userUpdateSchema } from "@/schemas/user";
 
-async function checkUserAccess(
-  userId: string,
-  session: { roleSlug?: RoleSlug; ministryIds?: string[] }
-) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { ministry: true, role: true, userMinistries: { select: { ministryId: true } } },
-  });
-  if (!user) return { error: "Not found" as const, status: 404 as const };
-  const roleSlug = (session.roleSlug ?? "user") as RoleSlug;
-  const ministryIds = session.ministryIds ?? [];
-  if (!canAccessUsers(roleSlug)) {
-    return { error: "Forbidden" as const, status: 403 as const };
-  }
-  if (roleSlug === "ministry_head") {
-    const userMinistryIds = user.userMinistries.map((um) => um.ministryId);
-    if (user.ministryId && !userMinistryIds.includes(user.ministryId)) {
-      userMinistryIds.push(user.ministryId);
-    }
-    const hasOverlap = userMinistryIds.some((mid) => ministryIds.includes(mid));
-    if (!hasOverlap) {
-      return { error: "Forbidden" as const, status: 403 as const };
-    }
-  }
-  return { user };
+export const dynamic = "force-dynamic";
+
+type Params = { params: Promise<{ id: string }> };
+
+function permissionSessionFrom(s: {
+  isAdmin: boolean;
+  ministryIds: string[];
+  headOfMinistryIds: string[];
+}): PermissionSession {
+  return {
+    isAdmin: s.isAdmin,
+    ministryIds: s.ministryIds,
+    headOfMinistryIds: s.headOfMinistryIds,
+  };
 }
 
-/**
- * GET /api/users/[id]
- * Fetch a single user. Auth: admin or ministry head (own ministry).
- */
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function guard(id: string) {
   const session = await getServerSession(authOptions);
   if (!session?.userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
+  const ps = permissionSessionFrom(session);
+  if (!canAccessUsers(ps)) {
+    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  }
+
+  const target = await prisma.user.findUnique({
+    where: { id },
+    include: { userMinistries: { select: { ministryId: true, role: true } } },
+  });
+  if (!target) {
+    return { error: NextResponse.json({ error: "Not found" }, { status: 404 }) };
+  }
+
+  // Ministry-head scoping: can only access users whose memberships
+  // intersect with the editor's headOfMinistryIds
+  if (!session.isAdmin) {
+    const targetMinistryIds = new Set(target.userMinistries.map((um) => um.ministryId));
+    const overlap = session.headOfMinistryIds.some((mid) => targetMinistryIds.has(mid));
+    if (!overlap) {
+      return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+    }
+  }
+
+  return { session, target };
+}
+
+export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
-  const check = await checkUserAccess(
-    id,
-    session as { roleSlug?: RoleSlug; ministryIds?: string[] }
-  );
-  if ("error" in check) return NextResponse.json({ error: check.error }, { status: check.status });
-  const userMinistryIds = check.user.userMinistries?.map((um) => um.ministryId) ?? [];
-  if (check.user.ministryId && !userMinistryIds.includes(check.user.ministryId)) {
-    userMinistryIds.unshift(check.user.ministryId);
-  }
+  const g = await guard(id);
+  if ("error" in g) return g.error;
+
+  const full = await prisma.user.findUnique({
+    where: { id },
+    include: {
+      userMinistries: {
+        include: { ministry: { select: { id: true, name: true } } },
+      },
+    },
+  });
+  if (!full) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
   return NextResponse.json({
-    ...check.user,
-    ministryIds: userMinistryIds,
-    hashedPassword: undefined,
-    userMinistries: undefined,
+    user: {
+      id: full.id,
+      email: full.email,
+      name: full.name,
+      address: full.address,
+      age: full.age,
+      birthday: full.birthday?.toISOString() ?? null,
+      isAdmin: full.isAdmin,
+      status: full.status,
+      ministries: full.userMinistries.map((um) => ({
+        id: um.ministry.id,
+        name: um.ministry.name,
+        role: um.role,
+      })),
+    },
   });
 }
 
-/**
- * PUT /api/users/[id]
- * Update user. Auth: admin or ministry head (own ministry).
- */
-export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] }).ministryIds ?? [];
+export async function PUT(request: Request, { params }: Params) {
   const { id } = await params;
-  const check = await checkUserAccess(
-    id,
-    session as { roleSlug?: RoleSlug; ministryIds?: string[] }
-  );
-  if ("error" in check) return NextResponse.json({ error: check.error }, { status: check.status });
+  const g = await guard(id);
+  if ("error" in g) return g.error;
 
-  const body = await request.json().catch(() => ({}));
-  const parsed = userUpdateSchema.safeParse(body);
+  const parsed = userUpdateSchema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json(
       { message: parsed.error.errors[0]?.message ?? "Validation failed" },
@@ -87,86 +99,108 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     );
   }
 
-  if (roleSlug === "ministry_head") {
-    if (parsed.data.ministryIds !== undefined) {
-      const allAllowed = parsed.data.ministryIds.every((mid) => ministryIds.includes(mid));
-      if (!allAllowed) {
-        return NextResponse.json(
-          { error: "Cannot assign user to ministries outside your scope" },
-          { status: 403 }
-        );
+  const data = parsed.data;
+  const isAdminEditor = g.session.isAdmin;
+
+  // Ministry head editors: drop all basic-info fields silently
+  const allowedBasic = isAdminEditor
+    ? {
+        name: data.name,
+        email: data.email,
+        address: data.address,
+        age: data.age,
+        birthday: data.birthday,
+        isAdmin: data.isAdmin,
+        status: data.status,
+      }
+    : {};
+
+  // Ministry assignments diff
+  let ministryUpdates: { replace: Array<{ ministryId: string; role: "head" | "member" }> } | null =
+    null;
+
+  if (data.ministryAssignments !== undefined) {
+    if (isAdminEditor) {
+      ministryUpdates = { replace: data.ministryAssignments };
+    } else {
+      // Ministry head: validate that every ministry in the payload is in their scope
+      const headSet = new Set(g.session.headOfMinistryIds);
+      for (const a of data.ministryAssignments) {
+        if (!headSet.has(a.ministryId)) {
+          return NextResponse.json(
+            { error: "Cannot modify ministries outside your scope" },
+            { status: 403 }
+          );
+        }
+      }
+      // Merge: preserve out-of-scope memberships, replace in-scope ones
+      const preserved = g.target.userMinistries.filter((um) => !headSet.has(um.ministryId));
+      ministryUpdates = {
+        replace: [
+          ...preserved.map((um) => ({
+            ministryId: um.ministryId,
+            role: um.role as "head" | "member",
+          })),
+          ...data.ministryAssignments,
+        ],
+      };
+    }
+  }
+
+  // Transactional update
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id },
+      data: {
+        ...(allowedBasic.name !== undefined && { name: allowedBasic.name }),
+        ...(allowedBasic.email !== undefined && { email: allowedBasic.email }),
+        ...(allowedBasic.address !== undefined && { address: allowedBasic.address }),
+        ...(allowedBasic.age !== undefined && { age: allowedBasic.age }),
+        ...(allowedBasic.birthday !== undefined && { birthday: allowedBasic.birthday }),
+        ...(allowedBasic.isAdmin !== undefined && { isAdmin: allowedBasic.isAdmin }),
+        ...(allowedBasic.status !== undefined && { status: allowedBasic.status }),
+        updatedAt: new Date(),
+      },
+    });
+
+    if (ministryUpdates) {
+      await tx.userMinistry.deleteMany({ where: { userId: id } });
+      if (ministryUpdates.replace.length > 0) {
+        await tx.userMinistry.createMany({
+          data: ministryUpdates.replace.map((a) => ({
+            userId: id,
+            ministryId: a.ministryId,
+            role: a.role,
+          })),
+        });
       }
     }
-    const adminRole = await prisma.role.findUnique({ where: { slug: "admin" } });
-    if (adminRole && parsed.data.roleId === adminRole.id) {
-      return NextResponse.json({ error: "Cannot assign admin role" }, { status: 403 });
-    }
-  }
-
-  if (parsed.data.email) {
-    const existing = await prisma.user.findFirst({
-      where: { email: parsed.data.email, NOT: { id } },
-    });
-    if (existing) {
-      return NextResponse.json({ message: "Email already in use" }, { status: 400 });
-    }
-  }
-
-  const updateData: {
-    name?: string;
-    email?: string;
-    ministryId?: string | null;
-    roleId?: string;
-    status?: string;
-  } = {
-    ...(parsed.data.name !== undefined && { name: parsed.data.name }),
-    ...(parsed.data.email !== undefined && { email: parsed.data.email }),
-    ...(parsed.data.roleId !== undefined && { roleId: parsed.data.roleId }),
-    ...(parsed.data.status !== undefined && { status: parsed.data.status }),
-  };
-
-  if (parsed.data.ministryIds !== undefined) {
-    updateData.ministryId = parsed.data.ministryIds[0] ?? null;
-  }
-
-  const user = await prisma.user.update({
-    where: { id },
-    data: updateData,
   });
 
-  if (parsed.data.ministryIds !== undefined) {
-    await prisma.userMinistry.deleteMany({ where: { userId: id } });
-    if (parsed.data.ministryIds.length > 0) {
-      await prisma.userMinistry.createMany({
-        data: parsed.data.ministryIds.map((ministryId) => ({ userId: id, ministryId })),
-      });
-    }
-  }
-  return NextResponse.json({ id: user.id });
+  return NextResponse.json({ ok: true });
 }
 
-/**
- * DELETE /api/users/[id]
- * Deactivate user (set status to inactive). Auth: admin or ministry head (own ministry).
- */
-export async function DELETE(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(_request: Request, { params }: Params) {
+  const { id } = await params;
   const session = await getServerSession(authOptions);
   if (!session?.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const { id } = await params;
-  const check = await checkUserAccess(
-    id,
-    session as { roleSlug?: RoleSlug; ministryIds?: string[] }
-  );
-  if ("error" in check) return NextResponse.json({ error: check.error }, { status: check.status });
+  if (!session.isAdmin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
-  await prisma.user.update({
-    where: { id },
-    data: { status: "inactive" },
-  });
-  return NextResponse.json({ ok: true });
+  try {
+    await prisma.user.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch {
+    // P2003 = foreign key constraint violation (user has authored records)
+    return NextResponse.json(
+      {
+        error:
+          "This user has created records (ARFs, lineups, checks, etc.) that reference them. Deactivate instead of deleting.",
+      },
+      { status: 409 }
+    );
+  }
 }

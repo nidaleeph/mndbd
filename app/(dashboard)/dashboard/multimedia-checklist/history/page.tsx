@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
-import { canViewChecklistHistory, type RoleSlug } from "@/lib/permissions";
+import { canViewChecklistHistory, type PermissionSession } from "@/lib/permissions";
 import { getMultimediaMinistryId } from "@/lib/checklist";
 import { HistoryTabs } from "@/features/checklist/HistoryTabs";
 
@@ -19,8 +19,12 @@ export default async function HistoryPage({
   if (!multimediaMinistryId) {
     return <div className="p-page">Multimedia ministry not configured.</div>;
   }
-  const roleSlug = (session.roleSlug ?? "user") as RoleSlug;
-  if (!canViewChecklistHistory(roleSlug, session.ministryIds ?? [], multimediaMinistryId)) {
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
+  if (!canViewChecklistHistory(ps, multimediaMinistryId)) {
     redirect("/dashboard");
   }
 

@@ -1,197 +1,210 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { signIn, useSession } from "next-auth/react";
+import { useState, useEffect, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button, Input, Card, Select } from "@/components/ui";
-import { signupSchema, type SignupFormData } from "@/schemas/user";
-import type { SelectOption } from "@/components/ui/Select";
+import { Button, Input, Card } from "@/components/ui";
+
+interface Ministry {
+  id: string;
+  name: string;
+  description?: string | null;
+}
+
+interface FormData {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  ministryIds: string[];
+}
 
 export default function SignupPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (status === "authenticated" && session?.userId) {
-      router.replace("/dashboard");
-    }
-  }, [status, session?.userId, router]);
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState<SignupFormData>({
+  const [ministries, setMinistries] = useState<Ministry[]>([]);
+  const [formData, setFormData] = useState<FormData>({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
-    roleId: "",
+    ministryIds: [],
   });
-  const [errors, setErrors] = useState<Partial<Record<keyof SignupFormData, string>>>({});
-  const [roles, setRoles] = useState<SelectOption[]>([]);
-  const [ministries, setMinistries] = useState<SelectOption[]>([]);
+  const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
+  const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
+  // Redirect authenticated users
   useEffect(() => {
-    fetch("/api/options/roles?for=signup")
-      .then((r) => r.json())
-      .then((data: { id: string; name: string }[]) =>
-        setRoles(data.map((r) => ({ value: r.id, label: r.name })))
-      )
-      .catch(() => {});
-    fetch("/api/options/ministries")
-      .then((r) => r.json())
-      .then((data: { id: string; name: string }[]) =>
-        setMinistries([
-          { value: "", label: "No ministry" },
-          ...data.map((m) => ({ value: m.id, label: m.name })),
-        ])
-      )
-      .catch(() => {});
+    if (status === "authenticated" && session?.userId) {
+      if (session.status === "pending") {
+        router.replace("/pending");
+      } else {
+        router.replace("/dashboard");
+      }
+    }
+  }, [status, session?.userId, session?.status, router]);
+
+  // Load ministries
+  useEffect(() => {
+    fetch("/api/options/ministries", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Failed to load ministries"))))
+      .then((data: { ministries?: Ministry[] } | Ministry[]) => {
+        const list = Array.isArray(data) ? data : (data.ministries ?? []);
+        setMinistries(list);
+      })
+      .catch(() => setMinistries([]));
   }, []);
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name as keyof SignupFormData]) {
-      setErrors((prev) => ({ ...prev, [name]: undefined }));
-    }
-  }
+  const toggleMinistry = useCallback((id: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      ministryIds: prev.ministryIds.includes(id)
+        ? prev.ministryIds.filter((m) => m !== id)
+        : [...prev.ministryIds, id],
+    }));
+  }, []);
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
-    const parsed = signupSchema.safeParse(formData);
-    if (!parsed.success) {
-      const fieldErrors: Partial<Record<keyof SignupFormData, string>> = {};
-      parsed.error.errors.forEach((err) => {
-        const path = err.path[0] as keyof SignupFormData;
-        if (path) fieldErrors[path] = err.message;
-      });
-      setErrors(fieldErrors);
-      return;
-    }
-    setErrors({});
-    setLoading(true);
-    try {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: parsed.data.name,
-          email: parsed.data.email,
-          password: parsed.data.password,
-          roleId: parsed.data.roleId,
-          ministryId: parsed.data.ministryId || null,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.message ?? "Registration failed.");
-        return;
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setSubmitError(null);
+      const nextErrors: Partial<Record<keyof FormData, string>> = {};
+      if (!formData.name.trim()) nextErrors.name = "Name is required";
+      if (!formData.email) nextErrors.email = "Email is required";
+      if (formData.password.length < 8) nextErrors.password = "Min 8 characters";
+      if (formData.password !== formData.confirmPassword) {
+        nextErrors.confirmPassword = "Passwords do not match";
       }
-      // signIn with redirect: true so NextAuth handles redirect and cookie
-      const result = await signIn("credentials", {
-        email: parsed.data.email,
-        password: parsed.data.password,
-        callbackUrl: "/dashboard",
-        redirect: true,
-      });
-      if (result?.error) {
-        setError("Account created. Please sign in.");
+      if (formData.ministryIds.length === 0) {
+        nextErrors.ministryIds = "Pick at least one ministry";
       }
-    } catch {
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }
+      setErrors(nextErrors);
+      if (Object.keys(nextErrors).length > 0) return;
 
-  if (status === "loading" || (status === "authenticated" && session?.userId)) {
+      setLoading(true);
+      try {
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { message?: string };
+          throw new Error(data.message ?? "Signup failed");
+        }
+        setSuccess(true);
+      } catch (err) {
+        setSubmitError(err instanceof Error ? err.message : "Signup failed");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [formData]
+  );
+
+  if (success) {
     return (
-      <main className="p-page flex min-h-screen items-center justify-center bg-[var(--color-soft-blue-bg)]">
-        <p className="text-[var(--color-text-muted)]">Redirecting...</p>
-      </main>
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <Card className="w-full max-w-md p-8 text-center">
+          <h1 className="mb-2 text-xl font-semibold">Thanks for signing up</h1>
+          <p className="mb-6 text-sm text-[var(--color-text-muted)]">
+            An admin will review your request. You&apos;ll be able to sign in once your account is
+            approved.
+          </p>
+          <Link
+            href="/login"
+            className="inline-block rounded-[var(--radius)] bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white"
+          >
+            Go to login
+          </Link>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <main className="p-page flex min-h-screen items-center justify-center bg-[var(--color-soft-blue-bg)]">
-      <Card className="w-full max-w-md">
-        <h1 className="mb-2 text-xl font-bold text-[var(--color-text-dark)]">Sign up</h1>
-        <p className="mb-6 text-sm text-[var(--color-text-muted)]">
-          Create your Church Ministry account
-        </p>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          {error && (
-            <p className="text-sm text-red-600" role="alert">
-              {error}
-            </p>
-          )}
+    <div className="flex min-h-screen items-center justify-center p-6">
+      <Card className="w-full max-w-md p-8">
+        <h1 className="mb-6 text-xl font-semibold">Sign up</h1>
+        {submitError ? (
+          <div className="mb-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+            {submitError}
+          </div>
+        ) : null}
+        <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             label="Name"
-            name="name"
-            type="text"
-            autoComplete="name"
             value={formData.name}
-            onChange={handleChange}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             error={errors.name}
           />
           <Input
             label="Email"
-            name="email"
             type="email"
-            autoComplete="email"
             value={formData.email}
-            onChange={handleChange}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             error={errors.email}
           />
           <Input
             label="Password"
-            name="password"
             type="password"
-            autoComplete="new-password"
             value={formData.password}
-            onChange={handleChange}
+            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
             error={errors.password}
           />
           <Input
             label="Confirm password"
-            name="confirmPassword"
             type="password"
-            autoComplete="new-password"
             value={formData.confirmPassword}
-            onChange={handleChange}
+            onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
             error={errors.confirmPassword}
           />
-          {roles.length > 0 && (
-            <Select
-              label="Role"
-              name="roleId"
-              options={roles}
-              value={formData.roleId}
-              onChange={handleChange}
-              error={errors.roleId}
-            />
-          )}
-          {ministries.length > 1 && (
-            <Select
-              label="Ministry"
-              name="ministryId"
-              options={ministries}
-              value={formData.ministryId ?? ""}
-              onChange={handleChange}
-            />
-          )}
-          <Button type="submit" variant="primary" loading={loading} className="w-full">
-            Create account
+
+          <div>
+            <label className="mb-2 block text-sm font-medium">
+              Ministries <span className="text-[var(--color-text-muted)]">(pick one or more)</span>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {ministries.map((m) => {
+                const selected = formData.ministryIds.includes(m.id);
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => toggleMinistry(m.id)}
+                    className={`rounded border p-2 text-left text-xs transition ${
+                      selected
+                        ? "border-[var(--color-primary)] bg-[var(--color-soft-blue-bg)]"
+                        : "border-[var(--color-border)]"
+                    }`}
+                  >
+                    <div className="font-medium">{m.name}</div>
+                    {m.description ? (
+                      <div className="text-[var(--color-text-muted)]">{m.description}</div>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+            {errors.ministryIds ? (
+              <div className="mt-1 text-xs text-red-600">{errors.ministryIds}</div>
+            ) : null}
+          </div>
+
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading ? "Submitting…" : "Sign up"}
           </Button>
+          <p className="text-center text-xs text-[var(--color-text-muted)]">
+            Already have an account?{" "}
+            <Link href="/login" className="text-[var(--color-primary)] underline">
+              Sign in
+            </Link>
+          </p>
         </form>
-        <p className="mt-4 text-sm text-[var(--color-text-muted)]">
-          Already have an account?{" "}
-          <Link href="/login" className="text-[var(--color-primary)] hover:underline">
-            Sign in
-          </Link>
-        </p>
       </Card>
-    </main>
+    </div>
   );
 }

@@ -2,7 +2,11 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canViewChecklistHistory, type RoleSlug } from "@/lib/permissions";
+import {
+  canViewChecklistHistory,
+  canEditChecklistTemplate,
+  type PermissionSession,
+} from "@/lib/permissions";
 import { getMultimediaMinistryId, computeRunProgress } from "@/lib/checklist";
 import { ChecklistLandingClient } from "@/features/checklist/ChecklistLandingClient";
 
@@ -17,15 +21,16 @@ export default async function MultimediaChecklistLanding() {
     return <div className="p-page">Multimedia ministry not configured.</div>;
   }
 
-  const roleSlug = (session.roleSlug ?? "user") as RoleSlug;
-  const ministryIds = session.ministryIds ?? [];
-  if (!canViewChecklistHistory(roleSlug, ministryIds, multimediaMinistryId)) {
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
+  if (!canViewChecklistHistory(ps, multimediaMinistryId)) {
     redirect("/dashboard");
   }
 
-  const canManage =
-    roleSlug === "admin" ||
-    (roleSlug === "ministry_head" && ministryIds.includes(multimediaMinistryId));
+  const canManage = canEditChecklistTemplate(ps, multimediaMinistryId);
 
   const template = await prisma.checklistTemplate.findUnique({
     where: { ministryId: multimediaMinistryId },

@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canManageChecklistRuns, type RoleSlug } from "@/lib/permissions";
+import { canManageChecklistRuns, type PermissionSession } from "@/lib/permissions";
 import { getMultimediaMinistryId, computeUpcomingSundayManila } from "@/lib/checklist";
 import { publishRunChanged } from "@/services/checklistEvents";
 
@@ -13,13 +13,16 @@ export async function POST() {
   if (!session?.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const roleSlug = (session.roleSlug ?? "user") as RoleSlug;
-  const ministryIds = session.ministryIds ?? [];
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
   const multimediaMinistryId = await getMultimediaMinistryId();
   if (!multimediaMinistryId) {
     return NextResponse.json({ error: "Multimedia ministry not found" }, { status: 500 });
   }
-  if (!canManageChecklistRuns(roleSlug, ministryIds, multimediaMinistryId)) {
+  if (!canManageChecklistRuns(ps, multimediaMinistryId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

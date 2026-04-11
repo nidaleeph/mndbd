@@ -1,21 +1,34 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { RoleSlug } from "@/lib/permissions";
-import { canAccessPrayers, canManagePrayer, canViewAllPrayers } from "@/lib/permissions";
+import {
+  canAccessPrayers,
+  canManagePrayer,
+  canViewAllPrayers,
+  type PermissionSession,
+} from "@/lib/permissions";
+import { getParakletosMinistryId } from "@/lib/checklist";
 import { PageContainer, Card, Button } from "@/components/ui";
 import { FiPlus } from "react-icons/fi";
 import Link from "next/link";
 import { PrayerTableClient } from "@/features/prayer/PrayerTableClient";
 
-const PARAKLETOS_SLUG = "parakletos";
-
 export default async function PrayersPage() {
   const session = await getServerSession(authOptions);
-  const roleSlug = (session as { roleSlug?: RoleSlug })?.roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] })?.ministryIds ?? [];
+  if (!session?.userId) {
+    return (
+      <PageContainer title="Prayers">
+        <p>You must be signed in.</p>
+      </PageContainer>
+    );
+  }
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
 
-  if (!canAccessPrayers(roleSlug)) {
+  if (!canAccessPrayers()) {
     return (
       <PageContainer title="Prayers">
         <p>You do not have access to this page.</p>
@@ -23,10 +36,8 @@ export default async function PrayersPage() {
     );
   }
 
-  const parakletos = await prisma.ministry.findUnique({
-    where: { slug: PARAKLETOS_SLUG },
-  });
-  if (!parakletos) {
+  const parakletosId = await getParakletosMinistryId();
+  if (!parakletosId) {
     return (
       <PageContainer title="Prayers">
         <p>Parakletos ministry not found. Please run the database seed.</p>
@@ -34,10 +45,10 @@ export default async function PrayersPage() {
     );
   }
 
-  const viewAll = canViewAllPrayers(roleSlug, ministryIds, parakletos.id);
+  const viewAll = canViewAllPrayers(ps, parakletosId);
   const where = viewAll
-    ? { ministryId: parakletos.id }
-    : { ministryId: parakletos.id, createdById: session?.userId ?? "" };
+    ? { ministryId: parakletosId }
+    : { ministryId: parakletosId, createdById: session.userId };
 
   const rawPrayers = await prisma.prayer.findMany({
     where,
@@ -46,13 +57,7 @@ export default async function PrayersPage() {
   });
 
   const prayers = rawPrayers.map((p) => {
-    const perms = canManagePrayer(
-      roleSlug,
-      ministryIds,
-      parakletos.id,
-      p.createdById,
-      session?.userId ?? ""
-    );
+    const perms = canManagePrayer(ps, parakletosId, p.createdById, session.userId);
     return {
       ...p,
       createdAt: p.createdAt.toISOString(),

@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getPusher, getPusherChannelName } from "@/lib/pusher";
-import type { RoleSlug } from "@/lib/permissions";
-import { canManageMinistry, canSeeDraftLineup } from "@/lib/permissions";
+import { canSeeDraftLineup, isMinistryMember, type PermissionSession } from "@/lib/permissions";
+import { getMusicMinistryId } from "@/lib/checklist";
 import { getLineupParticipantIds } from "@/lib/notificationRecipients";
 import { createNotificationsForUserIds } from "@/services/notificationService";
 
@@ -18,17 +18,20 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!lineup) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] }).ministryIds ?? [];
-  const canAccessDraft =
-    canSeeDraftLineup(
-      roleSlug,
-      lineup.createdById,
-      lineup.ministryId,
-      session.userId,
-      ministryIds
-    ) || canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
-  if (lineup.status === "Draft" && !canAccessDraft) {
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
+  const musicMinistryId = await getMusicMinistryId();
+  if (!musicMinistryId) {
+    return NextResponse.json({ error: "Music ministry not found" }, { status: 500 });
+  }
+  if (lineup.status === "Draft") {
+    if (!canSeeDraftLineup(ps, lineup.createdById, session.userId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  } else if (!isMinistryMember(ps, musicMinistryId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const messages = await prisma.chatMessage.findMany({
@@ -57,17 +60,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!lineup) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
-  const ministryIds = (session as { ministryIds?: string[] }).ministryIds ?? [];
-  const canAccessDraft =
-    canSeeDraftLineup(
-      roleSlug,
-      lineup.createdById,
-      lineup.ministryId,
-      session.userId,
-      ministryIds
-    ) || canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
-  if (lineup.status === "Draft" && !canAccessDraft) {
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
+  const musicMinistryId = await getMusicMinistryId();
+  if (!musicMinistryId) {
+    return NextResponse.json({ error: "Music ministry not found" }, { status: 500 });
+  }
+  if (lineup.status === "Draft") {
+    if (!canSeeDraftLineup(ps, lineup.createdById, session.userId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  } else if (!isMinistryMember(ps, musicMinistryId)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const body = await request.json().catch(() => ({}));

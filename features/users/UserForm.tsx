@@ -1,244 +1,344 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { Button, Input, MultiSelect, Select } from "@/components/ui";
-import { userCreateSchema, userUpdateSchema } from "@/schemas/user";
-import type { UserCreateFormData, UserUpdateFormData } from "@/schemas/user";
-import type { SelectOption } from "@/components/ui/Select";
+import { useCallback, useState } from "react";
+import { Button, Input, Card } from "@/components/ui";
 
-interface UserFormProps {
-  /** Create mode when undefined; edit mode when user id provided */
-  userId?: string;
+interface Ministry {
+  id: string;
+  name: string;
 }
 
-/**
- * Shared form for creating and editing users.
- * Create: name, email, password, role, ministries.
- * Edit: name, email, ministries, role, status (no password unless explicitly added later).
- */
-export function UserForm({ userId }: UserFormProps) {
-  const router = useRouter();
-  const isEdit = Boolean(userId);
-  const [loading, setLoading] = useState(false);
+interface MinistryAssignment {
+  ministryId: string;
+  ministryName: string;
+  role: "head" | "member";
+}
+
+export interface UserFormInitial {
+  id?: string;
+  name: string;
+  email: string;
+  address?: string | null;
+  age?: number | null;
+  birthday?: string | null;
+  isAdmin: boolean;
+  status: "pending" | "active" | "inactive";
+  ministries: MinistryAssignment[];
+}
+
+export interface UserFormSubmitBody {
+  name?: string;
+  email?: string;
+  password?: string;
+  address?: string;
+  age?: number;
+  birthday?: string;
+  isAdmin?: boolean;
+  status?: "pending" | "active" | "inactive";
+  ministryAssignments?: { ministryId: string; role: "head" | "member" }[];
+}
+
+export interface UserFormProps {
+  /** Initial values in edit mode; undefined in create mode. */
+  initial?: UserFormInitial;
+  /** Full list of ministries for the add-picker. */
+  allMinistries: Ministry[];
+  /** Whether the current editor is admin (false = ministry head). */
+  editorIsAdmin: boolean;
+  /** Ministries the current editor heads (for head-scoped edit). */
+  editorHeadOfMinistryIds: string[];
+  /** Called with the validated form body to submit. */
+  onSubmit: (body: UserFormSubmitBody) => Promise<void>;
+  submitLabel: string;
+}
+
+export function UserForm({
+  initial,
+  allMinistries,
+  editorIsAdmin,
+  editorHeadOfMinistryIds,
+  onSubmit,
+  submitLabel,
+}: UserFormProps) {
+  const isCreate = !initial;
+  const [name, setName] = useState(initial?.name ?? "");
+  const [email, setEmail] = useState(initial?.email ?? "");
+  const [password, setPassword] = useState("");
+  const [address, setAddress] = useState(initial?.address ?? "");
+  const [age, setAge] = useState<string>(initial?.age != null ? String(initial.age) : "");
+  const [birthday, setBirthday] = useState(initial?.birthday ?? "");
+  const [isAdminFlag, setIsAdminFlag] = useState(initial?.isAdmin ?? false);
+  const [status, setStatus] = useState<"pending" | "active" | "inactive">(
+    initial?.status ?? "active"
+  );
+  const [assignments, setAssignments] = useState<MinistryAssignment[]>(initial?.ministries ?? []);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [roles, setRoles] = useState<SelectOption[]>([]);
-  const [ministries, setMinistries] = useState<SelectOption[]>([]);
-  const [formData, setFormData] = useState<UserCreateFormData & Partial<UserUpdateFormData>>({
-    name: "",
-    email: "",
-    password: "",
-    roleId: "",
-    ministryIds: [],
-    status: "active",
+
+  // Scoping for ministry head editors
+  const canEditBasicInfo = editorIsAdmin;
+  const canEditIsAdmin = editorIsAdmin;
+  const canEditStatus = editorIsAdmin;
+
+  const isMinistryInEditorScope = useCallback(
+    (mId: string): boolean => editorIsAdmin || editorHeadOfMinistryIds.includes(mId),
+    [editorIsAdmin, editorHeadOfMinistryIds]
+  );
+
+  const visibleAssignments = assignments.filter((a) => isMinistryInEditorScope(a.ministryId));
+
+  const addableMinistries = allMinistries.filter((m) => {
+    if (assignments.some((a) => a.ministryId === m.id)) return false;
+    if (!editorIsAdmin && !editorHeadOfMinistryIds.includes(m.id)) return false;
+    return true;
   });
-  const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
 
-  const ministriesUrl = isEdit
-    ? "/api/options/ministries"
-    : "/api/options/ministries?context=user-create";
+  const [addPickerOpen, setAddPickerOpen] = useState(false);
 
-  useEffect(() => {
-    fetch("/api/options/roles")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: { id: string; name: string }[]) =>
-        setRoles(data.map((r) => ({ value: r.id, label: r.name })))
+  const toggleRole = useCallback((ministryId: string) => {
+    setAssignments((prev) =>
+      prev.map((a) =>
+        a.ministryId === ministryId ? { ...a, role: a.role === "head" ? "member" : "head" } : a
       )
-      .catch(() => {});
-    fetch(ministriesUrl)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: { id: string; name: string }[]) =>
-        setMinistries(data.map((m) => ({ value: m.id, label: m.name })))
-      )
-      .catch(() => {});
-  }, [ministriesUrl]);
+    );
+  }, []);
 
-  useEffect(() => {
-    if (userId) {
-      fetch(`/api/users/${userId}`)
-        .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Failed to load"))))
-        .then(
-          (data: {
-            name: string;
-            email: string;
-            ministryIds: string[];
-            roleId: string;
-            status: string;
-          }) => {
-            setFormData((prev) => ({
-              ...prev,
-              name: data.name,
-              email: data.email,
-              ministryIds: data.ministryIds ?? [],
-              roleId: data.roleId,
-              status: data.status === "inactive" ? "inactive" : "active",
-            }));
-          }
-        )
-        .catch(() => setError("Failed to load user"));
-    }
-  }, [userId]);
+  const removeAssignment = useCallback((ministryId: string) => {
+    setAssignments((prev) => prev.filter((a) => a.ministryId !== ministryId));
+  }, []);
 
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-      const { name, value } = e.target;
-      setFormData((prev) => ({ ...prev, [name]: value === "" ? "" : value }));
-      if (errors[name]) setErrors((prev) => ({ ...prev, [name]: undefined }));
-    },
-    [errors]
-  );
-
-  const handleMinistryIdsChange = useCallback(
-    (ids: string[]) => {
-      setFormData((prev) => ({ ...prev, ministryIds: ids }));
-      if (errors.ministryIds) setErrors((prev) => ({ ...prev, ministryIds: undefined }));
-    },
-    [errors.ministryIds]
-  );
+  const addAssignment = useCallback((ministryId: string, ministryName: string) => {
+    setAssignments((prev) => [...prev, { ministryId, ministryName, role: "member" }]);
+    setAddPickerOpen(false);
+  }, []);
 
   const handleSubmit = useCallback(
-    async (e: React.FormEvent<HTMLFormElement>) => {
+    async (e: React.FormEvent) => {
       e.preventDefault();
       setError(null);
-      setLoading(true);
+      setBusy(true);
       try {
-        if (isEdit) {
-          const parsed = userUpdateSchema.safeParse({
-            name: formData.name,
-            email: formData.email,
-            ministryIds: formData.ministryIds ?? [],
-            roleId: formData.roleId || undefined,
-            status: formData.status,
-          });
-          if (!parsed.success) {
-            const fieldErrors: Partial<Record<string, string>> = {};
-            parsed.error.errors.forEach((err) => {
-              const path = err.path[0] as string;
-              if (path) fieldErrors[path] = err.message;
-            });
-            setErrors(fieldErrors);
-            return;
-          }
-          const res = await fetch(`/api/users/${userId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(parsed.data),
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            setError(data.message ?? "Update failed");
-            return;
-          }
-          router.push(`/dashboard/users/${userId}`);
-          router.refresh();
-        } else {
-          const parsed = userCreateSchema.safeParse({
-            name: formData.name,
-            email: formData.email,
-            password: formData.password,
-            roleId: formData.roleId,
-            ministryIds: formData.ministryIds ?? [],
-          });
-          if (!parsed.success) {
-            const fieldErrors: Partial<Record<string, string>> = {};
-            parsed.error.errors.forEach((err) => {
-              const path = err.path[0] as string;
-              if (path) fieldErrors[path] = err.message;
-            });
-            setErrors(fieldErrors);
-            return;
-          }
-          const res = await fetch("/api/users", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(parsed.data),
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            setError(data.message ?? data.error ?? "Create failed");
-            return;
-          }
-          router.push(`/dashboard/users/${data.id}`);
-          router.refresh();
+        const body: UserFormSubmitBody = {};
+
+        if (canEditBasicInfo) {
+          body.name = name.trim();
+          body.email = email;
+          if (address) body.address = address;
+          if (age) body.age = Number(age);
+          if (birthday) body.birthday = birthday;
         }
-      } catch {
-        setError("Something went wrong");
+        if (canEditIsAdmin) {
+          body.isAdmin = isAdminFlag;
+        }
+        if (canEditStatus) {
+          body.status = status;
+        }
+        if (isCreate) {
+          // Create mode requires name, email, password regardless of editor scoping
+          body.name = name.trim();
+          body.email = email;
+          if (password) body.password = password;
+        }
+
+        if (editorIsAdmin) {
+          body.ministryAssignments = assignments.map((a) => ({
+            ministryId: a.ministryId,
+            role: a.role,
+          }));
+        } else {
+          body.ministryAssignments = assignments
+            .filter((a) => editorHeadOfMinistryIds.includes(a.ministryId))
+            .map((a) => ({ ministryId: a.ministryId, role: a.role }));
+        }
+
+        await onSubmit(body);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Save failed");
       } finally {
-        setLoading(false);
+        setBusy(false);
       }
     },
-    [isEdit, userId, formData, router]
+    [
+      canEditBasicInfo,
+      canEditIsAdmin,
+      canEditStatus,
+      name,
+      email,
+      address,
+      age,
+      birthday,
+      isAdminFlag,
+      status,
+      isCreate,
+      password,
+      editorIsAdmin,
+      assignments,
+      editorHeadOfMinistryIds,
+      onSubmit,
+    ]
   );
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      {error && (
-        <p className="text-sm text-red-600" role="alert">
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {error ? (
+        <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
           {error}
-        </p>
-      )}
-      <Input
-        label="Name"
-        name="name"
-        type="text"
-        value={formData.name}
-        onChange={handleChange}
-        error={errors.name}
-      />
-      <Input
-        label="Email"
-        name="email"
-        type="email"
-        value={formData.email}
-        onChange={handleChange}
-        error={errors.email}
-      />
-      {!isEdit && (
-        <Input
-          label="Password"
-          name="password"
-          type="password"
-          autoComplete="new-password"
-          value={formData.password}
-          onChange={handleChange}
-          error={errors.password}
-        />
-      )}
-      <Select
-        label="Role"
-        name="roleId"
-        options={roles}
-        value={formData.roleId}
-        onChange={handleChange}
-        error={errors.roleId}
-      />
-      <MultiSelect
-        label="Ministries"
-        options={ministries}
-        value={formData.ministryIds ?? []}
-        onChange={handleMinistryIdsChange}
-        error={errors.ministryIds}
-      />
-      {isEdit && (
-        <Select
-          label="Status"
-          name="status"
-          options={[
-            { value: "active", label: "Active" },
-            { value: "inactive", label: "Inactive" },
-          ]}
-          value={formData.status ?? "active"}
-          onChange={handleChange}
-        />
-      )}
-      <div className="flex gap-2">
-        <Button type="submit" loading={loading}>
-          {isEdit ? "Save changes" : "Create user"}
-        </Button>
-        <Button type="button" variant="outline" onClick={() => router.back()}>
-          Cancel
-        </Button>
-      </div>
+        </div>
+      ) : null}
+
+      {/* Basic info */}
+      <Card className="p-4">
+        <h3 className="mb-3 text-sm font-semibold">Basic info</h3>
+        <div className="space-y-3">
+          <Input
+            label="Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={!canEditBasicInfo && !isCreate}
+          />
+          <Input
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={!canEditBasicInfo && !isCreate}
+          />
+          {isCreate ? (
+            <Input
+              label="Password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          ) : null}
+          <Input
+            label="Address"
+            value={address ?? ""}
+            onChange={(e) => setAddress(e.target.value)}
+            disabled={!canEditBasicInfo}
+          />
+          <Input
+            label="Age"
+            type="number"
+            value={age}
+            onChange={(e) => setAge(e.target.value)}
+            disabled={!canEditBasicInfo}
+          />
+          <Input
+            label="Birthday"
+            type="date"
+            value={birthday ?? ""}
+            onChange={(e) => setBirthday(e.target.value)}
+            disabled={!canEditBasicInfo}
+          />
+          {canEditStatus ? (
+            <div>
+              <label className="mb-1 block text-xs font-medium">Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as "pending" | "active" | "inactive")}
+                className="w-full rounded border border-[var(--color-border)] p-2 text-sm"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          ) : null}
+          {canEditIsAdmin ? (
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={isAdminFlag}
+                onChange={(e) => setIsAdminFlag(e.target.checked)}
+              />
+              <span>Admin (global access to all ministries)</span>
+            </label>
+          ) : null}
+        </div>
+      </Card>
+
+      {/* Ministry memberships */}
+      <Card className="p-4">
+        <h3 className="mb-3 text-sm font-semibold">
+          Ministries{" "}
+          {!editorIsAdmin ? (
+            <span className="text-xs font-normal text-[var(--color-text-muted)]">
+              (only showing ministries you head)
+            </span>
+          ) : null}
+        </h3>
+        {visibleAssignments.length === 0 ? (
+          <div className="text-sm text-[var(--color-text-muted)]">No ministry memberships yet.</div>
+        ) : (
+          <div className="space-y-2">
+            {visibleAssignments.map((a) => (
+              <div
+                key={a.ministryId}
+                className="flex items-center gap-3 rounded border border-[var(--color-border)] p-2"
+              >
+                <span className="flex-1 text-sm">{a.ministryName}</span>
+                <label className="flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={a.role === "head"}
+                    onChange={() => toggleRole(a.ministryId)}
+                  />
+                  <span>Head</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => removeAssignment(a.ministryId)}
+                  className="text-red-600 hover:text-red-800"
+                  aria-label={`Remove ${a.ministryName}`}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {addableMinistries.length > 0 ? (
+          <div className="mt-3">
+            {!addPickerOpen ? (
+              <button
+                type="button"
+                onClick={() => setAddPickerOpen(true)}
+                className="rounded border border-dashed border-[var(--color-primary)] px-3 py-1 text-xs text-[var(--color-primary)]"
+              >
+                + Add ministry
+              </button>
+            ) : (
+              <div className="space-y-2 rounded border border-[var(--color-border)] p-2">
+                <div className="mb-1 text-xs font-medium">Pick a ministry:</div>
+                <div className="flex flex-wrap gap-1">
+                  {addableMinistries.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => addAssignment(m.id, m.name)}
+                      className="rounded border border-[var(--color-border)] px-2 py-1 text-xs hover:bg-[var(--color-soft-blue-bg)]"
+                    >
+                      {m.name}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAddPickerOpen(false)}
+                  className="text-xs text-[var(--color-text-muted)]"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        ) : null}
+      </Card>
+
+      <Button type="submit" disabled={busy}>
+        {busy ? "Saving…" : submitLabel}
+      </Button>
     </form>
   );
 }

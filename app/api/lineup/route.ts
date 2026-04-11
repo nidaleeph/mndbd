@@ -2,22 +2,25 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { canCreateLineup, type RoleSlug } from "@/lib/permissions";
+import { canCreateLineup, type PermissionSession } from "@/lib/permissions";
+import { getMusicMinistryId } from "@/lib/checklist";
 import { lineupSchema } from "@/schemas/lineup";
-
-const MUSIC_SLUG = "music";
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const roleSlug = ((session as { roleSlug?: string }).roleSlug ?? "user") as RoleSlug;
-  const ministryIds = (session as { ministryIds?: string[] }).ministryIds ?? [];
-  const musicMinistry = await prisma.ministry.findUnique({
-    where: { slug: MUSIC_SLUG },
-  });
-  if (!musicMinistry || !canCreateLineup(roleSlug, ministryIds, musicMinistry.id)) {
+  const ps: PermissionSession = {
+    isAdmin: session.isAdmin,
+    ministryIds: session.ministryIds,
+    headOfMinistryIds: session.headOfMinistryIds,
+  };
+  const musicMinistryId = await getMusicMinistryId();
+  if (!musicMinistryId) {
+    return NextResponse.json({ error: "Music ministry not found" }, { status: 500 });
+  }
+  if (!canCreateLineup(ps, musicMinistryId)) {
     return NextResponse.json(
       { error: "Only Music ministry members can create lineups" },
       { status: 403 }
@@ -39,7 +42,7 @@ export async function POST(request: Request) {
     data: {
       eventName: parsed.data.eventName,
       date: parsed.data.date,
-      ministryId: musicMinistry.id,
+      ministryId: musicMinistryId,
       status,
       createdById: session.userId,
       updatedAt: new Date(),
