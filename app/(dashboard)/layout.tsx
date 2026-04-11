@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { RoleSlug } from "@/lib/permissions";
+import { getMultimediaMinistryId } from "@/lib/checklist";
 import { DashboardShell } from "@/components/layout/DashboardShell";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -11,6 +12,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect("/login?callbackUrl=/dashboard");
   }
   const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
+  const ministryIds = session.ministryIds ?? [];
+  const multimediaMinistryId = await getMultimediaMinistryId();
+  const isMultimediaMember =
+    multimediaMinistryId !== null && ministryIds.includes(multimediaMinistryId);
 
   const unreadCount = await prisma.notification.count({
     where: { userId: session.userId, read: false },
@@ -45,6 +50,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       unreadCount={unreadCount}
       pusherKey={pusherKey}
       pusherCluster={pusherCluster}
+      isMultimediaMember={isMultimediaMember}
     >
       {children}
     </DashboardShell>

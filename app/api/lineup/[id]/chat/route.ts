@@ -21,8 +21,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
   const ministryIds = (session as { ministryIds?: string[] }).ministryIds ?? [];
   const canAccessDraft =
-    canSeeDraftLineup(roleSlug, lineup.createdById, lineup.ministryId, session.userId, ministryIds) ||
-    canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
+    canSeeDraftLineup(
+      roleSlug,
+      lineup.createdById,
+      lineup.ministryId,
+      session.userId,
+      ministryIds
+    ) || canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
   if (lineup.status === "Draft" && !canAccessDraft) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -55,8 +60,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const roleSlug = (session as { roleSlug?: RoleSlug }).roleSlug ?? "user";
   const ministryIds = (session as { ministryIds?: string[] }).ministryIds ?? [];
   const canAccessDraft =
-    canSeeDraftLineup(roleSlug, lineup.createdById, lineup.ministryId, session.userId, ministryIds) ||
-    canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
+    canSeeDraftLineup(
+      roleSlug,
+      lineup.createdById,
+      lineup.ministryId,
+      session.userId,
+      ministryIds
+    ) || canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
   if (lineup.status === "Draft" && !canAccessDraft) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

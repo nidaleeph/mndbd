@@ -148,3 +148,44 @@ export function canSeeDraftLineup(
   if (createdById === userId) return true;
   return false;
 }
+
+// --- Multimedia checklist permissions ---
+
+/** Everyone in the Multimedia ministry (plus admin) can view history — transparency, not management gate. */
+export function canViewChecklistHistory(
+  roleSlug: RoleSlug,
+  userMinistryIds: string[],
+  multimediaMinistryId: string
+): boolean {
+  if (roleSlug === "admin") return true;
+  return userMinistryIds.includes(multimediaMinistryId);
+}
+
+/** Any Multimedia member (plus admin) can check/uncheck items on the live run. */
+export function canToggleChecklistItem(
+  roleSlug: RoleSlug,
+  userMinistryIds: string[],
+  multimediaMinistryId: string
+): boolean {
+  if (roleSlug === "admin") return true;
+  return userMinistryIds.includes(multimediaMinistryId);
+}
+
+/** Only admin or Multimedia ministry_head can edit the template (add/reorder/archive). */
+export function canEditChecklistTemplate(
+  roleSlug: RoleSlug,
+  userMinistryIds: string[],
+  multimediaMinistryId: string
+): boolean {
+  if (roleSlug === "admin") return true;
+  return roleSlug === "ministry_head" && userMinistryIds.includes(multimediaMinistryId);
+}
+
+/** Same set as template editing — start/close runs is a management action. */
+export function canManageChecklistRuns(
+  roleSlug: RoleSlug,
+  userMinistryIds: string[],
+  multimediaMinistryId: string
+): boolean {
+  return canEditChecklistTemplate(roleSlug, userMinistryIds, multimediaMinistryId);
+}

@@ -55,7 +55,8 @@ export default async function LineupListPage() {
   const lineups = filtered.map((l) => {
     const canEdit =
       roleSlug === "admin" ||
-      (l.status === "Draft" && (l.createdById === userId || canManageMinistry(roleSlug, ministryIds, l.ministryId))) ||
+      (l.status === "Draft" &&
+        (l.createdById === userId || canManageMinistry(roleSlug, ministryIds, l.ministryId))) ||
       (l.status !== "Draft" && canManageMinistry(roleSlug, ministryIds, l.ministryId));
     const canApprove = canManageMinistry(roleSlug, ministryIds, l.ministryId);
     const statusActions: Array<"submit" | "approve"> =

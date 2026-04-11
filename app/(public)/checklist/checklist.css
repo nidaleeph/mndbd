@@ -1,0 +1,233 @@
+/* Tech-ops dark theme for the public checklist page.
+   Scoped under .checklist-root so it never leaks into the dashboard. */
+
+.checklist-root {
+  --bg-deep: #050a14;
+  --bg-panel: #0b1220;
+  --bg-panel-2: #0f172a;
+  --bg-panel-3: #1e293b;
+  --cl-border: #1e293b;
+  --cl-border-hi: #334155;
+  --cl-text: #e2e8f0;
+  --cl-text-dim: #94a3b8;
+  --cl-text-dimmer: #64748b;
+  --cl-cyan: #22d3ee;
+  --cl-cyan-dim: rgba(34, 211, 238, 0.15);
+  --cl-cyan-border: rgba(34, 211, 238, 0.35);
+  --cl-green: #4ade80;
+  --cl-red: #f87171;
+  --cl-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  background: var(--bg-deep);
+  color: var(--cl-text);
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.checklist-root .cl-container {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
+}
+
+.checklist-root .cl-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.checklist-root .cl-brand {
+  font-family: var(--cl-mono);
+  font-size: 13px;
+  color: var(--cl-cyan);
+  letter-spacing: 0.05em;
+}
+.checklist-root .cl-brand span {
+  color: var(--cl-text-dim);
+}
+.checklist-root .cl-status {
+  font-family: var(--cl-mono);
+  font-size: 10px;
+  color: var(--cl-cyan);
+  background: var(--cl-cyan-dim);
+  border: 1px solid var(--cl-cyan-border);
+  padding: 4px 10px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.checklist-root .cl-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cl-cyan);
+  box-shadow: 0 0 6px var(--cl-cyan);
+  animation: cl-pulse 1.8s ease-in-out infinite;
+}
+@keyframes cl-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.checklist-root .cl-hero {
+  background: var(--bg-panel-2);
+  border: 1px solid var(--cl-border);
+  border-radius: 10px;
+  padding: 22px 24px;
+  margin-bottom: 28px;
+}
+.checklist-root .cl-hero h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--cl-text);
+}
+.checklist-root .cl-date {
+  color: var(--cl-text-dim);
+  font-size: 13px;
+  margin-bottom: 18px;
+}
+.checklist-root .cl-progress-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+.checklist-root .cl-progress-row .cl-count,
+.checklist-root .cl-progress-row .cl-pct {
+  font-family: var(--cl-mono);
+  font-size: 14px;
+}
+.checklist-root .cl-progress-row .cl-count {
+  color: var(--cl-text);
+}
+.checklist-root .cl-progress-row .cl-pct {
+  color: var(--cl-cyan);
+}
+.checklist-root .cl-progress-bar {
+  height: 10px;
+  background: var(--bg-panel-3);
+  border-radius: 5px;
+  overflow: hidden;
+  border: 1px solid var(--cl-border);
+}
+.checklist-root .cl-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--cl-cyan), var(--cl-green));
+  box-shadow: 0 0 18px rgba(34, 211, 238, 0.5);
+  transition: width 0.3s ease;
+}
+
+.checklist-root .cl-category {
+  margin-bottom: 28px;
+}
+.checklist-root .cl-cat-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.checklist-root .cl-cat-tag {
+  font-family: var(--cl-mono);
+  font-size: 10px;
+  color: var(--cl-cyan);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--cl-cyan-border);
+  padding: 4px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.1em;
+}
+.checklist-root .cl-cat-title {
+  font-size: 13px;
+  color: var(--cl-text);
+  font-weight: 600;
+}
+.checklist-root .cl-cat-count {
+  font-family: var(--cl-mono);
+  font-size: 11px;
+  color: var(--cl-text-dimmer);
+  margin-left: auto;
+}
+
+.checklist-root .cl-items {
+  background: var(--bg-panel-2);
+  border: 1px solid var(--cl-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.checklist-root .cl-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 16px;
+  border-top: 1px solid var(--cl-border);
+  font-size: 14px;
+}
+.checklist-root .cl-item:first-child {
+  border-top: none;
+}
+.checklist-root .cl-check {
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--cl-border-hi);
+  background: var(--bg-panel-3);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  padding: 0;
+  color: var(--cl-text);
+}
+.checklist-root .cl-check.done {
+  background: var(--cl-cyan);
+  border-color: var(--cl-cyan);
+  color: var(--bg-deep);
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
+}
+.checklist-root .cl-item.done .cl-item-label {
+  color: var(--cl-text-dimmer);
+  text-decoration: line-through;
+}
+.checklist-root .cl-item-label {
+  flex: 1;
+  color: var(--cl-text);
+}
+.checklist-root .cl-item-meta {
+  font-family: var(--cl-mono);
+  font-size: 10px;
+  color: var(--cl-text-dimmer);
+}
+
+.checklist-root.can-check .cl-check {
+  cursor: pointer;
+}
+.checklist-root.can-check .cl-check:not(.done):hover {
+  border-color: var(--cl-cyan);
+  box-shadow: 0 0 6px rgba(34, 211, 238, 0.3);
+}
+
+.checklist-root .cl-signed-banner {
+  background: var(--cl-cyan-dim);
+  border: 1px solid var(--cl-cyan-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-family: var(--cl-mono);
+  font-size: 11px;
+  color: var(--cl-cyan);
+  margin-bottom: 22px;
+}
+
+.checklist-root .cl-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--cl-text-dim);
+}

@@ -15,6 +15,7 @@ interface DashboardShellProps {
   unreadCount: number;
   pusherKey: string;
   pusherCluster: string;
+  isMultimediaMember?: boolean;
   children: React.ReactNode;
 }
 
@@ -26,6 +27,7 @@ export function DashboardShell({
   unreadCount: initialUnreadCount,
   pusherKey,
   pusherCluster,
+  isMultimediaMember = false,
   children,
 }: DashboardShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -98,7 +100,11 @@ export function DashboardShell({
           onKeyDown={(e) => e.key === "Enter" && setSidebarCollapsed(true)}
         />
       )}
-      <Sidebar roleSlug={roleSlug} collapsed={sidebarCollapsed} />
+      <Sidebar
+        roleSlug={roleSlug}
+        collapsed={sidebarCollapsed}
+        isMultimediaMember={isMultimediaMember}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <Navbar
           user={user}

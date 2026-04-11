@@ -160,21 +160,92 @@ async function main() {
   });
   if (existingUser) {
     console.log(`Admin user already exists: ${adminEmail}`);
-    return;
+  } else {
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    await prisma.user.create({
+      data: {
+        email: adminEmail,
+        name: adminName,
+        hashedPassword,
+        roleId: adminRoleForUser.id,
+        updatedAt: now,
+      },
+    });
+    console.log(`Admin user created: ${adminEmail}`);
+    console.log(`  (Change password after first login or set ADMIN_PASSWORD in .env)`);
   }
 
-  const hashedPassword = await bcrypt.hash(adminPassword, 10);
-  await prisma.user.create({
-    data: {
-      email: adminEmail,
-      name: adminName,
-      hashedPassword,
-      roleId: adminRoleForUser.id,
-      updatedAt: now,
-    },
+  // --- Multimedia checklist starter template ---
+  const multimediaMinistry = await prisma.ministry.findUnique({
+    where: { slug: "multimedia" },
   });
-  console.log(`Admin user created: ${adminEmail}`);
-  console.log(`  (Change password after first login or set ADMIN_PASSWORD in .env)`);
+  if (multimediaMinistry) {
+    const template = await prisma.checklistTemplate.upsert({
+      where: { ministryId: multimediaMinistry.id },
+      create: { ministryId: multimediaMinistry.id, updatedAt: now },
+      update: { updatedAt: now },
+    });
+
+    const starterCategories: Array<{ name: string; items: string[] }> = [
+      {
+        name: "PC1 — Full Setup",
+        items: [
+          "Check all PowerPoint",
+          "Verify EZ Lyrics — all correct",
+          "Open vMix for NDI connections",
+          "Check all monitors are on",
+        ],
+      },
+      {
+        name: "PC2 — Camera & Stream",
+        items: [
+          "Back cam connected",
+          "OBS connection established",
+          "Front cam connection",
+          "Gimbal connection",
+        ],
+      },
+      {
+        name: "Sound Mixer",
+        items: ["Pulpit mic working", "PC1 output to mixer", "PC2 receiving audio from mixer"],
+      },
+    ];
+
+    for (let c = 0; c < starterCategories.length; c++) {
+      const cat = starterCategories[c];
+      const existing = await prisma.checklistCategory.findFirst({
+        where: { templateId: template.id, name: cat.name },
+      });
+      const category =
+        existing ??
+        (await prisma.checklistCategory.create({
+          data: {
+            templateId: template.id,
+            name: cat.name,
+            sortOrder: c,
+            updatedAt: now,
+          },
+        }));
+
+      for (let i = 0; i < cat.items.length; i++) {
+        const label = cat.items[i];
+        const existingItem = await prisma.checklistItem.findFirst({
+          where: { categoryId: category.id, label },
+        });
+        if (!existingItem) {
+          await prisma.checklistItem.create({
+            data: {
+              categoryId: category.id,
+              label,
+              sortOrder: i,
+              updatedAt: now,
+            },
+          });
+        }
+      }
+    }
+    console.log("Multimedia checklist starter template seeded.");
+  }
 }
 
 main()

@@ -244,9 +244,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
                 </li>
               ))}
               {searchable && searchQuery.trim() && filteredOptions.length === 0 && (
-                <li className="px-3 py-2 text-sm text-[var(--color-text-muted)]">
-                  No matches
-                </li>
+                <li className="px-3 py-2 text-sm text-[var(--color-text-muted)]">No matches</li>
               )}
             </ul>
           </div>

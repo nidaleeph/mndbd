@@ -12,6 +12,7 @@ import {
   FiSettings,
   FiBarChart2,
   FiHeart,
+  FiMonitor,
 } from "react-icons/fi";
 import type { RoleSlug } from "@/lib/permissions";
 
@@ -20,6 +21,8 @@ interface NavItem {
   label: string;
   icon: React.ReactNode;
   roles: RoleSlug[];
+  /** If true, also show when the user is a Multimedia ministry member (in addition to `roles`). */
+  allowIfMultimediaMember?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -40,6 +43,13 @@ const navItems: NavItem[] = [
     label: "Music Lineup",
     icon: <FiMusic className="size-5" />,
     roles: ["admin", "ministry_head", "user"],
+  },
+  {
+    href: "/dashboard/multimedia-checklist",
+    label: "Multimedia Checklist",
+    icon: <FiMonitor className="size-5" />,
+    roles: ["admin"],
+    allowIfMultimediaMember: true,
   },
   {
     href: "/dashboard/calendar",
@@ -83,13 +93,15 @@ export interface SidebarProps {
   roleSlug: RoleSlug;
   /** On mobile, when true sidebar is hidden (drawer closed). When false, sidebar is visible as overlay. */
   collapsed?: boolean;
+  isMultimediaMember?: boolean;
 }
 
-export function Sidebar({ roleSlug, collapsed = false }: SidebarProps) {
+export function Sidebar({ roleSlug, collapsed = false, isMultimediaMember = false }: SidebarProps) {
   const pathname = usePathname();
   const visibleItems = navItems.filter((item) => {
-    if (!item.roles.includes(roleSlug)) return false;
-    return true;
+    if (item.roles.includes(roleSlug)) return true;
+    if (item.allowIfMultimediaMember && isMultimediaMember) return true;
+    return false;
   });
 
   return (

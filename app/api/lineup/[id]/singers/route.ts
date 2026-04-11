@@ -15,8 +15,13 @@ async function checkLineupEditAccess(
   const roleSlug = (session.roleSlug ?? "user") as RoleSlug;
   const ministryIds = session.ministryIds ?? [];
   const canEdit =
-    canSeeDraftLineup(roleSlug, lineup.createdById, lineup.ministryId, session.userId, ministryIds) ||
-    canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
+    canSeeDraftLineup(
+      roleSlug,
+      lineup.createdById,
+      lineup.ministryId,
+      session.userId,
+      ministryIds
+    ) || canManageMinistry(roleSlug, ministryIds, lineup.ministryId);
   if (!canEdit) {
     return { error: "Forbidden" as const, status: 403 as const };
   }
